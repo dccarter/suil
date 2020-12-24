@@ -42,7 +42,10 @@ namespace suil::net::zmq {
                     return false;
                 }
                 else {
-                    itrace("ReceiveOperator::receiveFlags(Message...) received frame %zu bytes", frame.size());
+                    ltrace(
+                            &sock(),
+                            "ReceiveOperator::receiveFlags(Message...) received frame %zu bytes",
+                            frame.size());
                     break;
                 }
             } while (true);
@@ -95,7 +98,10 @@ namespace suil::net::zmq {
                 return false;
             }
             else {
-                itrace("ReceiveOperator::receiveFlags(Message...) received frame %zu bytes", frame.size());
+                ltrace(
+                        &sock(),
+                        "ReceiveOperator::receiveFlags(Message...) received frame %zu bytes",
+                        len);
                 len = res;
                 break;
             }

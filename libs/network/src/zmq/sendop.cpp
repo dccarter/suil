@@ -34,7 +34,7 @@ namespace suil::net::zmq {
             }
             else {
                 // data sent
-                itrace("SendOperator::sendFlags(...) %d bytes sent", sent);
+                ltrace(&sock(), "SendOperator::sendFlags(...) %d bytes sent", sent);
                 break;
             }
         } while (true);
@@ -68,7 +68,7 @@ namespace suil::net::zmq {
                 }
                 else {
                     // data sent
-                    itrace("SendOperator::sendFlags(...) %d bytes sent", sent);
+                    ltrace(&sock(), "SendOperator::sendFlags(...) %d bytes sent", sent);
                     break;
                 }
             } while (true);

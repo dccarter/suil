@@ -386,7 +386,7 @@ namespace suil::http::server {
                     } else if (_get_header(p, idx, field, value)) {
                         idx++;
                         itrace("multipart/form-data header field: " PRIs ", value: " PRIs,
-                               PRIs(field), PRIs(value));
+                               _PRIs(field), _PRIs(value));
                     } else {
                         itrace("error: multipart/form-data parsing header failed");
                         next_state = state_error;
@@ -403,8 +403,10 @@ namespace suil::http::server {
                 }
                 case state_end: {
                     state = state_end;
-                    itrace("multipart/form-data state machine done %d fields, %d files %d",
-                           form.size(), files.size(), mnow());
+                    itrace("multipart/form-data state machine done %d fields, %d files %lld",
+                           Ego._form._params.size(),
+                           Ego._form._uploads.size(),
+                           mnow());
                     return true;
                 }
                 case state_error:

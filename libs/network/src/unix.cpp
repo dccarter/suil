@@ -45,8 +45,7 @@ namespace suil::net {
 
         sock = unixconnect(addr());
         if (sock == nullptr) {
-            itrace("connection to address: %s failed: %s",
-                   Socketet::ipstr(addr), errno_s);
+            itrace("connection to address: " PRIs " failed: %s", _PRIs(addr), errno_s);
             return false;
         }
 
