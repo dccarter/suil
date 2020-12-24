@@ -41,5 +41,5 @@ jobs:
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       run: |
         cd ${{runner.workspace}}/build
-        cmake --buikld . --config $BUILD_TYPE --target deps
+        cmake --build . --config $BUILD_TYPE --target deps
         cmake --build . --config $BUILD_TYPE
