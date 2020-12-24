@@ -33,7 +33,7 @@ jobs:
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
       run: | 
         echo "cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
-        cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        echo "${{runner.workspace}}"
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
