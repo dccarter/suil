@@ -1,5 +1,5 @@
 # suil
-A lightweight mordern `C++` micro framework with lots of goodies package in various libraries
+A lightweight mordern `C++` micro framework with lots of goodies packaged in various libraries
 
 ```c++
 #include <suil/hpp/server/endpoint.hpp>
