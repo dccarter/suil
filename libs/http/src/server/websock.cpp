@@ -170,7 +170,7 @@ namespace suil::http {
 
         uint16 u16{0};
         if (!Ego._sock.receive(&u16, nbytes, Ego._api._timeout)) {
-            itrace("%s - receiving op code failed: %s", sock.id(), errno_s);
+            itrace("%s - receiving op code failed: %s", Ego._sock.id(), errno_s);
             return false;
         }
         h.u16All = u16;
@@ -223,7 +223,7 @@ namespace suil::http {
             buf[0] = (uint8) h.len;
             auto read = size_t(extraBytes-1);
             if (!Ego._sock.receive(&buf[1], read, Ego._api._timeout)) {
-                itrace("%s - receiving length failed: %s", sock.id(), errno_s);
+                itrace("%s - receiving length failed: %s", Ego._sock.id(), errno_s);
                 return false;
             }
             if (h.len == WS_PAYLOAD_EXTEND_1) {
@@ -258,7 +258,7 @@ namespace suil::http {
         b.reserve(h.payloadSize+2);
         auto buf = reinterpret_cast<uint8 *>(b.data());
         if (!Ego._sock.receive(buf, len, Ego._api._timeout) || len != h.payloadSize) {
-            itrace("%s - receiving web socket frame failed: %s", sock.id(), errno_s);
+            itrace("%s - receiving web socket frame failed: %s", Ego._sock.id(), errno_s);
             return false;
         }
 
@@ -276,7 +276,7 @@ namespace suil::http {
             Ego._api.onConnect(Ego);
             if (Ego._endSession) {
                 // onConnect reject connection
-                itrace("%s - websocket Connection rejected", sock.id());
+                itrace("%s - websocket Connection rejected", Ego._sock.id());
                 return;
             }
         }
@@ -295,7 +295,7 @@ namespace suil::http {
             // while the adaptor is still open
             if (!receiveFrame(h, b)) {
                 // receiving frame failed, abort Connection
-                itrace("%s - receive frame failed", ipstr(sock.addr()));
+                itrace("%s - receive frame failed", net::Socket::ipstr(Ego._sock.addr()));
                 Ego._endSession = true;
             }
             else {
@@ -351,7 +351,7 @@ namespace suil::http {
 
         if (Ego._endSession) {
             itrace("%s - sending while Session is closing is not allow",
-                   sock.id());
+                   Ego._sock.id());
             return false;
         }
 

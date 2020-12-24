@@ -101,7 +101,7 @@ namespace suil::http::server {
             resp.clear();
         } while (!Ego._close);
 
-        itrace("%s - done handling Connection, %d", Ego._sock.id(), close_);
+        itrace("%s - done handling Connection, %d", Ego._sock.id(), _close);
     }
 
     void ConnectionImpl::sendResponse(Request& req, Response& resp, bool err)
