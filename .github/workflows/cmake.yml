@@ -32,11 +32,14 @@ jobs:
       # and build directories, but this is only available with CMake 3.13 and higher.  
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
       run: | 
-        echo "cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
-        echo "${{runner.workspace}}"
+        cd ${{runner.workspace}}/build
+        cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
     - name: Build
       # working-directory: ${{runner.workspace}}/build
       shell: bash
       # Execute the build.  You can specify a specific target with "--target <NAME>"
-      run: echo cmake --build . --config $BUILD_TYPE
+      run: |
+        cd ${{runner.workspace}}/build
+        cmake --buikld . --config $BUILD_TYPE --target deps
+        cmake --build . --config $BUILD_TYPE
