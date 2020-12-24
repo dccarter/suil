@@ -1,0 +1,69 @@
+// load sbg library
+#include <string>
+#include <iostream>
+
+#include <iod/sio.hh>
+
+// Load suil base generator library used to generate
+// meta types
+#pragma load sbg
+
+namespace suil {
+    struct [[gen::sbg(meta)]] Deposit {
+#pragma native
+        Deposit(std::string id, int amount)
+            : AccountId{std::move(id)},
+              Amount{amount}
+        {}
+        Deposit() = default;
+#pragma endnative
+
+        std::string AccountId;
+        int         Amount;
+    };
+
+    struct [[gen::sbg(meta)]] Create {
+#pragma native
+        Create(std::string owner, std::string name)
+        : Owner{std::move(owner)},
+          AccountName{std::move(name)}
+        {}
+        Create() = default;
+#pragma endnative
+
+        std::string Owner;
+        std::string AccountName;
+    };
+
+    struct [[gen::sbg(meta)]] Withdraw {
+#pragma native
+        Withdraw(std::string id, int amount)
+            : AccountId{std::move(id)},
+              Amount{amount}
+        {}
+        Withdraw() = default;
+#pragma endnative
+        std::string AccountId;
+        int         Amount;
+    };
+
+    union [[gen::sbg(meta)]] Command {
+        Deposit deposit;
+        Create  create;
+        Withdraw withdraw;
+    };
+
+    struct [[gen::sbg(json)]] JsonOnly {
+        json::Object obj;
+        String name;
+        [[ignore]]
+        [[optional]]
+        iod::Nullable<json::Object> other;
+    };
+
+    union [[gen::sbg(wire)]] WireOnly {
+        Deposit deposit;
+        Withdraw withdraw;
+        Create  create;
+    };
+}

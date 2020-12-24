@@ -1,0 +1,20 @@
+// Example showing how to use the rpc generator
+
+#include <suil/base/string.hpp>
+#pragma native[cpp]
+#include <kvstore.hpp>
+#pragma endnative
+
+#pragma load rpc
+
+namespace suil::rpc {
+
+    class [[gen::rpc(json)]] [[gen::rpc(wire)]] KVStore {
+    public:
+        /// rpc method accepting a string reference
+        void set(const suil::String& name, const String& data);
+        /// rpc method returning a string
+        suil::String get(const String& name);
+    };
+
+}

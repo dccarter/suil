@@ -1,0 +1,64 @@
+#include <suil/base/string.hpp>
+
+#pragma load sbg
+
+namespace suil::http {
+
+    struct [[gen::sbg(json)]] JwtHeader {
+#pragma native
+        JwtHeader() = default;
+        explicit JwtHeader(String typ);
+
+        MOVE_CTOR(JwtHeader) = default;
+        MOVE_ASSIGN(JwtHeader) = default;
+
+        DISABLE_COPY(JwtHeader);
+#pragma endnative
+
+        String typ{"JWT"};
+        String alg{"HS256"};
+    };
+
+#pragma native[cpp]
+    JwtHeader::JwtHeader(String typ)
+        : typ{std::move(typ)}
+    {}
+#pragma endnative
+
+    struct [[gen::sbg(json)]] JwtPayload {
+#pragma native
+        JwtPayload();
+#pragma endnative
+
+        [[optional]]
+        [[ignore]]
+        String iss{""};
+        [[optional]]
+        [[ignore]]
+        String aud{""};
+        [[optional]]
+        [[ignore]]
+        String sub{""};
+        [[optional]]
+        [[ignore]]
+        int64  exp{0};
+        [[optional]]
+        [[ignore]]
+        int64  iat{0};
+        [[optional]]
+        [[ignore]]
+        int64  nbf{0};
+        [[optional]]
+        [[ignore]]
+        String jti{""};
+        [[optional]]
+        [[ignore]]
+        json::Object claims;
+    };
+
+#pragma native[cpp]
+    JwtPayload::JwtPayload()
+        : claims{json::Obj}
+    { }
+#pragma endnative
+}

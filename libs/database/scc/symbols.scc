@@ -1,0 +1,23 @@
+// Symbols used by sql
+
+#pragma symbol AUTO_INCREMENT
+#pragma symbol READ_ONLY
+#pragma symbol PRIMARY_KEY
+#pragma symbol UNIQUE
+#pragma symbol IGNORE
+#pragma symbol ASYNC
+#pragma symbol TIMEOUT
+#pragma symbol EXPIRES
+#pragma symbol NOT_NULL
+#pragma symbol SELECT
+#pragma symbol UPDATE
+#pragma symbol INSERT
+#pragma symbol WHERE
+#pragma symbol TABLE
+#pragma symbol LIMIT
+#pragma symbol ORDER_BY
+#pragma symbol GROUP_BY
+#pragma symbol INNER_JOIN
+#pragma symbol FROM
+#pragma symbol INTO
+#pragma symbol SET

@@ -1,0 +1,50 @@
+#include <suil/net/config.scc.hpp>
+
+#pragma load sbg
+
+#pragma symbol timeout
+#pragma symbol cookies
+#pragma symbol allowOrigin
+#pragma symbol allowHeaders
+#pragma symbol expires
+#pragma symbol key
+#pragma symbol realm
+#pragma symbol domain
+#pragma symbol path
+#pragma symbol jwtTokenUse
+#pragma symbol onConnect
+#pragma symbol onClose
+#pragma symbol onDisconnect
+#pragma symbol onMessage
+#pragma symbol blockingBroadcast
+
+#pragma symbol MinChars
+#pragma symbol MaxChars
+#pragma symbol Numbers
+#pragma symbol Special
+#pragma symbol Upper
+#pragma symbol Lower
+
+namespace suil::http::server {
+
+    struct [[gen::sbg(json)]] HttpServerConfig {
+        net::ServerConfig serverConfig;
+        int64  connectionTimeout{5_sec};
+        bool   diskOffload{false};
+        size_t diskOffloadMin{512_Kib};
+        size_t maxBodyLen{2_Mib};
+        size_t sendChunk{512_Kib};
+        uint64 keepAliveTime{3600_ms};
+        uint64 hstsEnable{3600_ms};
+        String serverName{"Suil-Http-Server"};
+        String offloadDir{"./.body"};
+    };
+
+    struct [[gen::sbg(json)]] HttpServerStats {
+        uint16    pid{0};
+        uint64    rxBytes{0};
+        uint64    txBytes{0};
+        uint64    openRequests{0};
+        uint64    totalRequests{0};
+    };
+}

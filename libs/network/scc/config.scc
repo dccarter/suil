@@ -1,0 +1,58 @@
+// Configuration data types for various net components
+#include <suil/base/string.hpp>
+#include <suil/base/units.hpp>
+
+// needed to generate the configuration
+#pragma load sbg
+
+namespace suil::net {
+
+    struct [[gen::sbg(meta)]] TcpAddress {
+        String  name{"127.0.0.1"};
+        int     port{80};
+    };
+
+    struct [[gen::sbg(meta)]] TcpSocketConfig {
+        TcpAddress bindAddr;
+    };
+
+    struct [[gen::sbg(meta)]] SslSocketConfig {
+        TcpAddress      bindAddr;
+        String key;
+        String cert;
+    };
+
+    struct [[gen::sbg(meta)]] UnixSocketConfig {
+        String     bindAddr;
+    };
+
+    union [[gen::sbg(meta)]] SocketConfig {
+        SslSocketConfig  sslConfig;
+        TcpSocketConfig  tcpConfig;
+        UnixSocketConfig unixConfig;
+    };
+
+
+    struct [[gen::sbg(meta)]] ServerConfig {
+        SocketConfig  socketConfig;
+        int           acceptBacklog{127};
+        std::int64_t  acceptTimeout{-1};
+        std::uint64_t acceptLimit{64};
+    };
+
+    struct [[gen::sbg(meta)]] SmtpServerConfig {
+        std::int64_t sendTimeout{30_sec};
+        std::int64_t waitTimeout{5_min};
+    };
+
+    struct [[gen::sbg(meta)]] SmtpClientConfig {
+        std::int64_t sendTimeout{30_sec};
+        std::int64_t receiveTimeout{2_min};
+        std::int64_t greetingTimeout{5_min};
+        std::int64_t mailFromTimeout{5_min};
+        std::int64_t rcptToTimeout{5_min};
+        std::int64_t dataInitTimeout{2_min};
+        std::int64_t dataBlockTimeout{2_min};
+        std::int64_t dataTermTimeout{10_min};
+    };
+}

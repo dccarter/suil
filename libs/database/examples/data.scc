@@ -1,0 +1,38 @@
+// Data structures needed to demonstrate PgSQL API usage
+#include <suil/db/symbols.scc.hpp>
+#include <suil/base/string.hpp>
+
+#pragma load sbg
+
+namespace suil::db {
+
+    struct [[gen::sbg(meta)]] User {
+#pragma native
+        User() = default;
+        User(String email, String username, int age, String phone);
+#pragma endnative
+
+        [[PRIMARY_KEY]]
+        [[AUTO_INCREMENT]]
+        int id;
+        [[NOT_NULL]]
+        [[UNIQUE]]
+        String Email;
+        [[NOT_NULL]]
+        [[UNIQUE]]
+        String Username;
+        int Age;
+        String Phone;
+        [[IGNORE]]
+        String Key;
+    };
+
+#pragma native[cpp]
+    User::User(String email, String username, int age, String phone)
+        : Email{std::move(email)},
+          Username{std::move(username)},
+          Age{age},
+          Phone{std::move(phone)}
+    {}
+#pragma endnative
+}

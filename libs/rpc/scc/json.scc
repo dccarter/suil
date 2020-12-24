@@ -1,0 +1,37 @@
+// JSON rpc serialized data structure
+#include <suil/base/json.hpp>
+#include <suil/base/string.hpp>
+
+#include <suil/rpc/common.scc.hpp>
+
+// Load library used to generate the meta types
+#pragma load sbg
+
+namespace suil::rpc::jrpc {
+
+    struct [[gen::sbg(json)]] Request {
+        String jsonrpc;
+        String method;
+        iod::Nullable<int> id;
+        [[optional]]
+        [[ignore]]
+        iod::Nullable<json::Object> params;
+    };
+
+    struct [[gen::sbg(json)]] Response {
+        String jsonrpc;
+        iod::Nullable<int> id;
+        [[optional]]
+        [[ignore]]
+        iod::Nullable<json::Object> result;
+        [[optional]]
+        [[ignore]]
+        iod::Nullable<RpcError> error;
+    };
+
+    /// < A result can either be an error or a success
+    union [[gen::sbg(json)]] Result {
+        json::Object success;
+        String error;
+    };
+}

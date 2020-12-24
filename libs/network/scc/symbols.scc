@@ -1,0 +1,8 @@
+// Symbols use by this project
+#pragma symbol timeout
+#pragma symbol domain
+#pragma symbol forceSsl
+#pragma symbol token
+#pragma symbol auth
+#pragma symbol username
+#pragma symbol passwd

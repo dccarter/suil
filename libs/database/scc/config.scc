@@ -1,0 +1,16 @@
+// Symbols used by sql
+#include <suil/base/string.hpp>
+#include <cstdint>
+
+// load sbg library
+#pragma load sbg
+
+namespace suil::db {
+
+    struct [[gen::sbg(meta)]] RedisDbConfig {
+        std::int64_t  Timeout{-1};
+        std::uint64_t KeepAlive{30000};
+        bool UseSsl{false};
+        String   Passwd{""};
+    };
+}

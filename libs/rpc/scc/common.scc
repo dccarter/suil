@@ -1,0 +1,43 @@
+// serializable data structures used in RPC
+#include <suil/base/json.hpp>
+#include <suil/base/string.hpp>
+#include <suil/base/units.hpp>
+
+#include <suil/net/config.scc.hpp>
+
+// Load library used to generate the meta types
+#pragma load sbg
+
+namespace suil::rpc {
+
+    struct [[gen::sbg(meta)]] RpcError {
+
+#pragma native
+        RpcError(int code, String msg, String data);
+        RpcError() = default;
+#pragma endnative
+        int    code;
+        String message;
+        String data;
+    };
+
+#pragma native[cpp]
+        RpcError::RpcError(int code, String msg, String data)
+            : code{code}, message{std::move(msg)}, data{std::move(data)}
+        {}
+#pragma endnative
+
+    struct [[gen::sbg(meta)]] RpcServerConfig {
+        std::int64_t receiveTimeout{30_sec};
+        std::int64_t sendTimeout{30_sec};
+        std::int64_t keepAlive{30_min};
+    };
+
+    struct [[gen::sbg(meta)]] RpcClientConfig {
+        net::SocketConfig socketConfig;
+        std::int64_t receiveTimeout{30_sec};
+        std::int64_t sendTimeout{30_sec};
+        std::int64_t connectTimeout{30_min};
+    };
+
+}

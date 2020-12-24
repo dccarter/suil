@@ -1,0 +1,47 @@
+// JSON rpc serialized data structure
+#include <suil/base/string.hpp>
+
+#include <suil/rpc/common.scc.hpp>
+
+// Load library used to generate the meta types
+#pragma load sbg
+
+namespace suil::rpc::srpc {
+
+    struct [[gen::sbg(wire)]] Request {
+        int id;
+        int method;
+        Data params;
+    };
+
+    union [[gen::sbg(wire)]] Result {
+        RpcError   error;
+        Data       data;
+    };
+    struct [[gen::sbg(wire)]] Response {
+        int id;
+        Result result;
+    };
+
+    struct [[gen::sbg(wire)]] Method {
+#pragma native
+        Method() = default;
+        Method(int id, String name);
+#pragma endnative
+        int id;
+        String name;
+    };
+
+#pragma native[cpp]
+    Method::Method(int id, String name)
+        : id{id},
+          name{std::move(name)}
+    {}
+#pragma endnative
+
+    struct [[gen::sbg(wire)]] Metadata {
+        String version;
+        std::vector<srpc::Method> methods;
+        std::vector<srpc::Method> extensions;
+    };
+}

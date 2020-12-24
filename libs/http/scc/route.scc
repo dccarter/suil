@@ -1,0 +1,107 @@
+#include <suil/base/string.hpp>
+
+#pragma load sbg
+
+namespace suil::http::server {
+
+    struct [[gen::sbg(json)]] Auth {
+#pragma native
+        Auth() = default;
+
+        template <typename ...R>
+        Auth(const String& r, R&&... roles)
+            : Enabled{true}
+        {
+            add(r, std::forward<R>(roles)...);
+        }
+
+        Auth(bool en)
+            : Enabled{en}
+        {}
+
+        MOVE_CTOR(Auth) = default;
+        MOVE_ASSIGN(Auth) = default;
+        COPY_CTOR(Auth) =  default;
+        COPY_ASSIGN(Auth) = default;
+
+        operator bool() const {
+            return Ego.Enabled;
+        }
+
+        bool empty() const {
+            return !Ego.Enabled;
+        }
+
+        bool check(const std::vector<String>& rs) const;
+        bool check(const json::Object& rs) const;
+
+        template <typename... Rs>
+        void add(const String& r, Rs&&... rs) {
+            Roles.push_back(r.dup());
+            if constexpr (sizeof...(rs) > 0) {
+                add(std::forward<Rs>(rs)...);
+            }
+        }
+
+#pragma endnative
+
+        bool Enabled{false};
+        std::vector<String> Roles;
+    };
+
+    struct [[gen::sbg(json)]] RouteAttributes {
+        bool   Static{false};
+        [[ignore]]
+        Auth   Authorize;
+        bool   ParseCookies{false};
+        bool   ParseForm{false};
+        String ReplyType;
+        bool   Enabled{true};
+    };
+
+    struct [[gen::sbg(json)]] RouteSchema {
+        int32   Id;
+        [[ignore]]
+        String  Name;
+        String  Rule;
+        [[ignore]]
+        String  Description;
+        std::vector<String> Methods;
+        RouteAttributes Attrs;
+    };
+
+#pragma native[cpp]
+    bool Auth::check(const std::vector<String>& rs) const
+    {
+        if (Roles.empty()) {
+            return true;
+        }
+
+        for (auto& r: Roles) {
+            for (auto& tmp: rs) {
+                if (r == tmp)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    bool Auth::check(const json::Object& rs) const
+    {
+        if (Roles.empty()) {
+            /* not roles setup */
+            return true;
+        }
+
+        for (auto& r: Roles) {
+            /* check if any of the roles is present */
+            for (const auto [_, role] : rs)
+                /* roles must be strings */
+                if (((String)role).compare(r, true) == 0)
+                    return true;
+        }
+        return false;
+    }
+
+#pragma endnative
+}
