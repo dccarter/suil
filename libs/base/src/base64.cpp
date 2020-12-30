@@ -138,7 +138,7 @@ namespace suil::Base64 {
         ob.reserve(2+((len+2)/3*4));
         int i;
         char *p = &ob.data()[ob.size()];
-        for (i = 0; i < len - 2; i += 3) {
+        for (i = 0; i < int(len) - 2; i += 3) {
             *p++ = b64tableU[(b[i] >> 2) & 0x3F];
             *p++ = b64tableU[((b[i] & 0x3) << 4) | ((int) (b[i + 1] & 0xF0) >> 4)];
             *p++ = b64tableU[((b[i + 1] & 0xF) << 2) | ((int) (b[i + 2] & 0xC0) >> 6)];

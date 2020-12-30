@@ -6,6 +6,7 @@
 #define SUIL_BASE_UTILS_HPP
 
 #include <suil/base/dtoa_milo.hpp>
+#include <suil/version.hpp>
 
 #include <unistd.h>
 #include <cstdint>

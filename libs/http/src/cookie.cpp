@@ -53,4 +53,28 @@ namespace suil::http {
         }
         return true;
     }
+
+    Cookie Cookie::parse(const String& cookieStr)
+    {
+        auto parseKeyPair = [&](const String& part) -> std::pair<String, String> {
+            auto eq = cookieStr.find('=');
+            if (eq == String::npos) {
+                return {part.trim(' '), {}};
+            }
+            auto name = cookieStr.substr(0, eq).strip(' ', true);
+            auto val = cookieStr.substr(eq+1).strip(' ', true);
+            return {std::move(name), std::move(val)};
+        };
+
+        auto pos = cookieStr.find(';');
+        if (pos == String::npos) {
+            auto [name, val] = parseKeyPair(cookieStr);
+            return Cookie{std::move(name), std::move(val)};
+        }
+
+        auto [name, val] = parseKeyPair(cookieStr.substr(0, pos));
+        Cookie cookie{std::move(name), std::move(val)};
+        // @TODO Parse reset of cookie
+        return std::move(cookie);
+    }
 }

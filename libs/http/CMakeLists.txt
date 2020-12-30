@@ -5,8 +5,10 @@ set(SUIL_HTTP_VERSION "0.1.0" CACHE STRING "The version of suil-http library")
 project(SuilHttp VERSION ${SUIL_HTTP_VERSION} LANGUAGES C CXX)
 
 include(Server.cmake)
+include(Client.cmake)
 
 set(SUIL_HTTP_SCC_SOURCES
+        scc/client.scc
         scc/jwt.scc
         scc/server.scc
         scc/route.scc)
@@ -15,13 +17,12 @@ SuilScc(SuilHttp
         PROJECT  0N
         SOURCES  ${SUIL_HTTP_SCC_SOURCES}
         LIB_PATH ${CMAKE_BINARY_DIR}
+        DEPENDS  SuilBase-Generator
         OUTDIR   ${CMAKE_BINARY_DIR}/scc/suil/http)
 
-
-# SuilBase generator needed
-add_dependencies(SuilHttp-scc SuilBase-Generator)
-
 add_dependencies(SuilHttpServer
+        SuilHttp-scc)
+add_dependencies(SuilHttpClient
         SuilHttp-scc)
 
 include(CMakePackageConfigHelpers)
@@ -43,7 +44,7 @@ write_basic_package_version_file(
         "${VERSION_CONFIG}" COMPATIBILITY SameMajorVersion)
 
 # Install base library
-install(TARGETS SuilHttpServer
+install(TARGETS SuilHttpServer SuilHttpClient
         EXPORT  ${TARGETS_EXPORT_NAME}
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)

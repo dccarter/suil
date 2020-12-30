@@ -83,10 +83,11 @@ namespace suil::net {
     std::size_t SslSock::sendfile(int fd, off_t offset, std::size_t len, const Deadline& dd)
     {
         if (!isOpen()) {
-            iwarn("flushing a closed socket is not supported");
+            iwarn("sendfile on a closed socket is not supported");
             errno = ENOTSUP;
             return false;
         }
+
         auto addr = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, offset);
         if (addr == MAP_FAILED) {
             iwarn("failed to mmap file for sending over ssl: %s", errno_s);

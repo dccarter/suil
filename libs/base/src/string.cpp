@@ -49,65 +49,63 @@ namespace suil {
         m_str[n] = '\0';
     }
 
-    String::String(Buffer &b, bool own) {
-        m_len = (uint32_t) b.size();
-        Ego.m_own = (uint8_t) ((own && (b.data() != nullptr)) ? 1 : 0);
-        if (Ego.m_own) {
-            m_str = b.release();
-        } else {
-            m_str = b.data();
-        }
+    String::String(Buffer &b, bool own)
+    {
+        m_len = uint32(b.size());
+        m_own = own;
+        m_str = own? b.release() : b.data();
     }
+
+    String::String(const Buffer& b)
+        : m_len{uint32(b.size())},
+          m_own{false},
+          m_str{b.data()}
+    {}
 
     String::String(String &&s) noexcept
-            : m_str(s.m_str),
-              m_len(s.m_len),
-              m_own(s.m_own),
-              m_hash(s.m_hash)
-    {
-        s.m_str = nullptr;
-        s.m_len = 0;
-        s.m_own = false;
-        s.m_hash = 0;
-    }
+            : m_str(std::exchange(s.m_str, nullptr)),
+              m_len(std::exchange(s.m_len, 0)),
+              m_own(std::exchange(s.m_own, false)),
+              m_hash(std::exchange(s.m_hash, 0))
+    {}
 
     String &String::operator=(String &&s) noexcept {
-        if (this != &s) {
-            if (m_str && m_own) {
-                ::free(m_str);
-            }
-
-            m_str = s.m_str;
-            m_len = s.m_len;
-            m_own = s.m_own;
-            m_hash = s.m_hash;
-            s.m_str = nullptr;
-            s.m_len = 0;
-            s.m_own = false;
-            s.m_hash = 0;
+        if (this == &s) {
+            return Ego;
         }
+
+        if (m_str && m_own) {
+            ::free(m_str);
+        }
+
+        m_str = std::exchange(s.m_str, nullptr);
+        m_len = std::exchange(s.m_len, 0);
+        m_own = std::exchange(s.m_own, false);
+        m_hash = std::exchange(s.m_hash, 0);
 
         return Ego;
     }
 
     String::String(const String &s)
-            : m_str(s.m_own ? duplicate(s.m_str, s.m_len) : s.m_str),
-              m_len(s.m_len),
-              m_own(s.m_own),
-              m_hash(s.m_hash)
+        : m_str{duplicate(s.m_str, s.m_len)},
+          m_len(s.m_len),
+          m_own(true),
+          m_hash(s.m_hash)
     {}
 
     String& String::operator=(const String &s) {
-        if (this != &s) {
-            if (m_str && m_own) {
-                ::free(m_str);
-            }
-
-            m_str  = s.m_own ? duplicate(s.m_str, s.m_len) : s.m_str;
-            m_len  = s.m_len;
-            m_own  = s.m_own;
-            m_hash = s.m_hash;
+        if (this == &s) {
+            return Ego;
         }
+
+        if (m_str && m_own) {
+            ::free(m_str);
+        }
+
+        m_str  = duplicate(s.m_str, s.m_len);
+        m_len  = s.m_len;
+        m_own  = s.m_own;
+        m_hash = s.m_hash;
         return Ego;
     }
 
@@ -149,6 +147,26 @@ namespace suil {
         return npos;
     }
 
+    size_t String::find(const String& str) const
+    {
+        if (empty()) {
+            return npos;
+        }
+        if (str.empty()) {
+            return 0;
+        }
+
+        const char *p = m_cstr;
+        const size_t len = str.size();
+        for (; (p = strchr(p, str[0])) != nullptr; p++)
+        {
+            if (strncmp (p, &str[0], len) == 0)
+                return size_t(p-m_cstr);
+        }
+
+        return npos;
+    }
+
     size_t String::rfind(char ch) const {
         ssize_t index{-1};
         if (Ego.m_len > 0) {
@@ -157,6 +175,27 @@ namespace suil {
                 if (i == 0) return -1;
             return i;
         }
+        return npos;
+    }
+
+    size_t String::rfind(const String& str) const
+    {
+        if (empty()) {
+            return npos;
+        }
+        if (str.empty()) {
+            return 0;
+        }
+
+        auto pos = rfind(str[0]);
+        const size_t len = str.size();
+        for (; pos != npos; pos = substr(0, pos).rfind(str[0]))
+        {
+            auto tmp = substr(pos);
+            if (tmp.startsWith(str))
+                return pos;
+        }
+
         return npos;
     }
 
@@ -198,11 +237,12 @@ namespace suil {
         m_own = false;
     }
 
-    String String::strip(char strip, bool ends) {
-        char		*s, *p, *e;
+    String String::strip(char strip, bool ends) const {
+        const char		*s, *e;
+        char *p;
 
         Buffer b(Ego.size());
-        void *tmp = b;
+        auto tmp = (void *) b;
         p = (char *)tmp;
         s = Ego.data();
         e = Ego.data() + (Ego.size()-1);
@@ -564,9 +604,9 @@ TEST_CASE("String test cases", "[common][String]") {
             REQUIRE(tmp1.m_str != nullptr);
             REQUIRE(tmp1.m_len == 11);
             REQUIRE_FALSE(tmp1.m_own);
-            REQUIRE(s3.m_str == tmp1.data());
+            REQUIRE_FALSE(s3.m_str == tmp1.data());
             REQUIRE(s3.m_len == 11);
-            REQUIRE_FALSE(s3.m_own);
+            REQUIRE(s3.m_own);
 
             sb::String tmp2{str, true};
             sb::String s4(tmp2);
@@ -583,9 +623,9 @@ TEST_CASE("String test cases", "[common][String]") {
             REQUIRE(tmp3.m_str != nullptr);
             REQUIRE(tmp3.m_len == 11);
             REQUIRE_FALSE(tmp3.m_own);
-            REQUIRE(s5.m_str == tmp3.data());
+            REQUIRE_FALSE(s5.m_str == tmp3.data());
             REQUIRE(s5.m_len == 11);
-            REQUIRE_FALSE(s5.m_own);
+            REQUIRE(s5.m_own);
 
             sb::String tmp4{str, true};
             sb::String s6 = tmp4;
@@ -804,7 +844,7 @@ TEST_CASE("String test cases", "[common][String]") {
         REQUIRE(p2[2].size() == 4);
         REQUIRE(p2[2].m_str == &s1.m_str[41]);
 
-        sb::String s2{p2[0]};
+        auto s2 = p2[0].peek();
         REQUIRE_THROWS(s2.tokenize(","));
         s2 = s2.dup();
         auto p3 = s2.tokenize(",");
@@ -994,7 +1034,7 @@ TEST_CASE("String test cases", "[common][String]") {
             REQUIRE(s3.compare(str.data()) == 0);
             auto ss = (sb::String) s3;
             REQUIRE(ss == s3);
-            REQUIRE(ss.m_cstr == s3.m_cstr);
+            REQUIRE_FALSE(ss.m_cstr == s3.m_cstr);
         }
     }
 }

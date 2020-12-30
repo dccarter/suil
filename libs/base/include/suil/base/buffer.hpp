@@ -391,13 +391,13 @@ namespace suil {
          * cast the buffer to a c-style string.
          * @return pointer to buffer as a c-style string
          */
-        operator char*();
+        explicit operator char*();
 
         /**
          * cast the buffer to a c-style string
          * @return pointer to buffer as a c-style string
          */
-        operator const char*() const {
+        explicit operator const char*() const {
             return (const char*) m_data;
         }
 
@@ -407,7 +407,7 @@ namespace suil {
          * @return a string whose data is a copy of the contents
          * of the buffer
          */
-        operator std::string() const {
+        explicit operator std::string() const {
             return std::string((const char*) m_data, m_offset);
         }
 
@@ -416,7 +416,7 @@ namespace suil {
          * @return a string view whose data is the contents
          * of the buffer
          */
-        operator strview() const {
+        explicit operator strview() const {
             return strview((const char*) m_data, size());
         }
 
@@ -480,7 +480,15 @@ namespace suil {
          * get pointer to memory used by buffer
          * @return pointer to memory used by the buffer
          */
-        operator const void*() {
+        operator void*() {
+            return m_data;
+        }
+
+        /**
+         * get pointer to memory used by buffer
+         * @return pointer to memory used by the buffer
+         */
+        operator const void*() const {
             return m_data;
         }
 

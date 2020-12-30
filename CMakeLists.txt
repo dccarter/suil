@@ -13,12 +13,26 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Some project options
 option(ENABLE_UNIT_TESTS    "Enable building of unit tests" ON)
 option(ENABLE_EXAMPLES      "Enable building examples included in the project" ON)
-option(ENABLE_TRACE         "Enable trace logs in debug builds (Debug only option)" ON)
 option(DEVEL_IDE            "When enabled, it will suppress some cmake errors" OFF)
 
-if(CMAKE_BUILD_TYPE STREQUAL Debug AND ENABLE_TRACE)
-    add_compile_definitions(SUIL_TRACE_ENABLED=1)
-endif()
+set(SUIL_ENABLE_BACKTRACE  1 CACHE STRING "Enable/Disable backtrace in builds")
+set(SUIL_ENABLE_TRACE  1 CACHE STRING "Enable trace logs in debug builds (Debug only option)")
+set(SUIL_BUILD_NUMBER  0 CACHE STRING "Build number version")
+set(SUIL_BUILD_TAG     devel CACHE STRING "Version tag string")
+set(SUIL_SOFTWARE_NAME suil  CACHE STRING "The name of the server")
+set(SUIL_DEBUG_TAG     1a30f8248a6b11e781846f6e6c696e65 CACHE STRING "The tag used by the debug application tag")
+set(SUIL_BASE_DIR      ".suil" CACHE STRING "The base directory of suil application")
+set(SUIL_COPYRIGHT     "Copyright (C) 2020, 2017-2020 Suilteam")
+
+# Some times implementations are unsafe, for example suil::String is VERY unsafe and need to
+# be used with caution.
+# Alternative implementations are
+# LAZY multiple type instances can share a buffer so the instances must be used with caution
+# SAFE use std::shared_ptr for the underlying buffer can be shared between types
+# VERY_SAFE does not share buffer, e.g method String::peek() will return a copy of the buffer
+set(SUIL_BUILD_TYPE_MODE    LAZY CACHE STRING "Switch between string implementations (Default LAZY)")
+
+set(SUIL_FILE_SERVER_ROUTE 1b7647618ea63937daae8ebb903e9175)
 
 # Tell libraries that they are supervised by god
 set(SUIL_GOD_MODE ON)
@@ -34,8 +48,14 @@ include(SuilScc)
 include(SuilGetOsVariant)
 if (OS_VARIANT)
     string(TOUPPER ${OS_VARIANT} OS_VARIANT)
-    add_compile_definitions(__${OS_VARIANT}__)
+else()
+    set(OS_VARIANT UBUNTU)
 endif()
+string(TOUPPER ${CMAKE_BUILD_TYPE} SUIL_BUILD_TYPE)
+
+configure_file(
+        ${CMAKE_SOURCE_DIR}/cmake/Version.cmake.in
+        ${CMAKE_BINARY_DIR}/.generated/suil/version.hpp)
 
 # OpenSSL is required to build suil libraries
 find_package(OpenSSL REQUIRED)
@@ -64,6 +84,8 @@ SuilCheckLibrary(sqlite3 LIBRARY sqlite3 libsqlite3)
 # Directory where scc sources are generated
 include_directories(${CMAKE_BINARY_DIR}/scc)
 
+# Directory with config file is generated
+include_directories(${CMAKE_BINARY_DIR}/.generated)
 # add suil base project
 include_directories(libs/base/include)
 add_subdirectory(libs/base)

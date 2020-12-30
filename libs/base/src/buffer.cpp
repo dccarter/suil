@@ -580,14 +580,14 @@ TEST_CASE("sb::Buffer tests", "[common][buffer]")
             REQUIRE(ob.size() == sizeof(a));
             REQUIRE(Check(ob, 0, a, sizeof(a)));
             // buffer will be string-fied on cast
-            char *data = ob;
+            char *data = static_cast<char *>(ob);
             REQUIRE(data[ob.m_offset] == '\0');
 
             ob.reset(16, true);
             ob << "Hello World";
-            sb::strview sv = ob;
+            auto sv = sb::strview(ob);
             REQUIRE(Check(ob, 0, &sv[0], sv.size()));
-            std::string str = ob;
+            auto str = std::string(ob);
             REQUIRE(Check(ob, 0, &str[0], str.size()));
         }
     }
