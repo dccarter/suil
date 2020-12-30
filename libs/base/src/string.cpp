@@ -604,9 +604,9 @@ TEST_CASE("String test cases", "[common][String]") {
             REQUIRE(tmp1.m_str != nullptr);
             REQUIRE(tmp1.m_len == 11);
             REQUIRE_FALSE(tmp1.m_own);
-            REQUIRE(s3.m_str == tmp1.data());
+            REQUIRE_FALSE(s3.m_str == tmp1.data());
             REQUIRE(s3.m_len == 11);
-            REQUIRE_FALSE(s3.m_own);
+            REQUIRE(s3.m_own);
 
             sb::String tmp2{str, true};
             sb::String s4(tmp2);
@@ -623,9 +623,9 @@ TEST_CASE("String test cases", "[common][String]") {
             REQUIRE(tmp3.m_str != nullptr);
             REQUIRE(tmp3.m_len == 11);
             REQUIRE_FALSE(tmp3.m_own);
-            REQUIRE(s5.m_str == tmp3.data());
+            REQUIRE_FALSE(s5.m_str == tmp3.data());
             REQUIRE(s5.m_len == 11);
-            REQUIRE_FALSE(s5.m_own);
+            REQUIRE(s5.m_own);
 
             sb::String tmp4{str, true};
             sb::String s6 = tmp4;
@@ -844,7 +844,7 @@ TEST_CASE("String test cases", "[common][String]") {
         REQUIRE(p2[2].size() == 4);
         REQUIRE(p2[2].m_str == &s1.m_str[41]);
 
-        sb::String s2{p2[0]};
+        auto s2 = p2[0].peek();
         REQUIRE_THROWS(s2.tokenize(","));
         s2 = s2.dup();
         auto p3 = s2.tokenize(",");
@@ -1034,7 +1034,7 @@ TEST_CASE("String test cases", "[common][String]") {
             REQUIRE(s3.compare(str.data()) == 0);
             auto ss = (sb::String) s3;
             REQUIRE(ss == s3);
-            REQUIRE(ss.m_cstr == s3.m_cstr);
+            REQUIRE_FALSE(ss.m_cstr == s3.m_cstr);
         }
     }
 }
