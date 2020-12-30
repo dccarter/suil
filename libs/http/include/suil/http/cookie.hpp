@@ -109,6 +109,8 @@ namespace suil::http {
 
         bool encode(Buffer& dst) const;
 
+        static Cookie parse(const String& cookieStr);
+
         ~Cookie() = default;
 
     private:

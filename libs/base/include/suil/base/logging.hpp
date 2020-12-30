@@ -5,8 +5,8 @@
 #ifndef SUIL_BASE_LOGGING_HPP
 #define SUIL_BASE_LOGGING_HPP
 
-#include "suil/base/utils.hpp"
-#include "suil/base/symbols.hpp"
+#include <suil/base/utils.hpp>
+#include <suil/base/symbols.hpp>
 
 #include <iod/options.hh>
 
@@ -20,7 +20,7 @@
 
 namespace suil {
 
-#ifdef ENABLE_BACKTRACE
+#if ENABLE_BACKTRACE==1
     /**
          * capture the current backtrace into the given buffer
          * @param buf the buffer to dump the stack trace into
@@ -383,7 +383,7 @@ namespace suil {
  */
 #define scritical(fmt, ...)      _LOG(&suil::_Log, CRITICAL, fmt, ##__VA_ARGS__)
 
-#ifdef SUIL_TRACE_ENABLED
+#if SUIL_ENABLE_TRACE==1
 /**
  * log a trace message using the given logging class \param sub
  * @param sub

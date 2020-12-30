@@ -79,7 +79,14 @@ namespace suil {
          * @param b the output buffer to be reference
          * @param own if true the output buffer will be released to this String
          */
-        String(Buffer& b, bool own = true);
+        explicit String(Buffer& b, bool own = true);
+
+        /**
+         * creates a string by referencing the buffer of an output buffer
+         * @param b the output buffer to be reference
+         * @param own if true the output buffer will be released to this String
+         */
+        explicit String(const Buffer& b);
 
         /**
          * moves construct string \param s to this string
@@ -176,6 +183,8 @@ namespace suil {
          */
         size_t find(char ch) const;
 
+        size_t find(const String& str) const;
+
         /**
          * find the occurrence of the given character, \param ch in the string,
          * searching from the end of the string towards the beginning
@@ -184,6 +193,8 @@ namespace suil {
          * found, otherwise, String::npos is returned
          */
         size_t rfind(char ch) const;
+
+        size_t rfind(const String& str) const;
 
         /**
          * get the substring of the current string
@@ -262,7 +273,7 @@ namespace suil {
          * @return a new string with the give \param character removed from the
          * string
          */
-        String strip(char strip = ' ', bool ends = false);
+        String strip(char strip = ' ', bool ends = false) const;
 
         /**
          * \see String::strip
@@ -270,7 +281,7 @@ namespace suil {
          * @return a new string with the give \param character removed from the
          * string
          */
-        inline String trim(char what = ' ') {
+        inline String trim(char what = ' ') const {
             return strip(what, true);
         }
 
@@ -498,6 +509,11 @@ namespace suil {
         bool ishex(int checkCase = -1 /* -1 lower, 0 no insensitive, 1 upper */);
 
         size_t maxByteSize() const;
+
+        /**
+         * Clears the given string. This will deallocate the underlying buffer
+         */
+        void clear();
 
     private suil_ut:
         /**

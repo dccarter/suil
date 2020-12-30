@@ -2,8 +2,8 @@
 // Created by Mpho Mbotho on 2020-12-15.
 //
 
-#ifndef LIBS_HTTP_INCLUDE_SUIL_HTTP_SERVER_FORM_HPP
-#define LIBS_HTTP_INCLUDE_SUIL_HTTP_SERVER_FORM_HPP
+#ifndef SUIL_HTTP_SERVER_FORM_HPP
+#define SUIL_HTTP_SERVER_FORM_HPP
 
 #include <suil/http/server/uploaded.hpp>
 
@@ -80,4 +80,4 @@ namespace suil::http::server {
         UnorderedMap<String> _params{};
     };
 }
-#endif //LIBS_HTTP_INCLUDE_SUIL_HTTP_SERVER_FORM_HPP
+#endif //SUIL_HTTP_SERVER_FORM_HPP

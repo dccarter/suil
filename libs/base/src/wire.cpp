@@ -137,6 +137,16 @@ namespace suil {
     size_t String::maxByteSize() const {
         return Wire::maxByteSize(Data{m_cstr, Ego.size(), false});
     }
+
+    void String::clear()
+    {
+        if (Ego.m_own and Ego.m_str) {
+            free(Ego.m_str);
+        }
+        Ego.m_str = nullptr;
+        Ego.m_own = false;
+        Ego.m_len = 0;
+    }
 }
 
 #ifdef SUIL_UNITTEST
