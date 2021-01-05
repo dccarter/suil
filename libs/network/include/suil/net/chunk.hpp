@@ -27,7 +27,7 @@ namespace suil::net {
         }
 
         inline const void* ptr() const {
-            return Ego._data.ptr;
+            return reinterpret_cast<const char*>(Ego._data.ptr) + Ego._off;
         }
 
         inline bool usesFd() const {

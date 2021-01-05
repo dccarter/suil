@@ -10,92 +10,55 @@
 #include "suil/http/server/jwtauth.hpp"
 #include "suil/http/server/jwtsession.hpp"
 #include "suil/http/server/redismw.hpp"
+#include "suil/http/server/fileserver.hpp"
 
 namespace hs = suil::http::server;
 namespace net  = suil::net;
 
 int main(int argc, char *argv[])
 {
-    using Server = hs::Endpoint<
-                        hs::Initializer,        // Block all routes until application is initialized
-                        hs::SystemAttrs,        // System level attributes
-                        hs::Cors,               // CORS
-                        hs::JwtAuthorization,   // Enable JWT authorization
-                        hs::RedisMiddleware,    // Provides access to a redis databas
-                        hs::JwtSession          // Caches JWT's
-                    >;
+    using Server = hs::Endpoint<>;
 
     net::ServerConfig sock = {
         .socketConfig = net::TcpSocketConfig{
-            .bindAddr = { .port = 8000 }
+            .bindAddr = { .name = "0.0.0.0", .port = 8000 }
         }
     };
 
     // Create an http endpoint
     Server ep("/", opt(serverConfig, std::move(sock)) ,opt(keepAliveTime, 5_min));
 
-    // Add endpoint administration routes
-    hs::EndpointAdmin::setup(ep);
-
-    // Configure hs::Initializer middleware
-    ep.middleware<hs::Initializer>().setup(ep, [](const hs::Request& req, hs::Response& resp) {
-        resp << "Server initialized by: " << req.query().get("admin");
-        return true;
-    });
-
-    // Configure hs::JwtAuthorization middleware
-    ep.middleware<hs::JwtAuthorization>().setup(opt(key, "dzHzHvr"));
-
-    // Configure hs::RedisMiddelware
-    ep.middleware<hs::RedisMiddleware>().setup("redis", 6379);
-
-    struct User {
-        suil::String passwd{};
-        std::vector<suil::String> roles{};
-    };
-    const suil::UnorderedMap<User> users = {
-            {"admin", {"admin123", {"System-Admin"}}},
-            {"demo", {"example123", {"software"}}}
-    };
-
     // Add an unsecure route used for login
-    Route(ep, "/login")
+    Route(ep, "/echo/1")
     ("GET"_method, "OPTIONS"_method)
     .attrs(opt(ReplyType, "text/plain"))
     ([&](const hs::Request& req, hs::Response& res) {
-        const auto& user = req.query().get("username");
-        const auto& passwd = req.query().get("passwd");
-
-        auto it = users.find(user);
-        if (it == users.end() or it->second.passwd != passwd) {
-            // invalid credentials provided
-            res << "Invalid credentials";
-            res.end(suil::http::Forbidden);
-            return;
-        }
-
-        auto& jwtSession = ep.context<hs::JwtSession>(req);
-        if (!jwtSession.authorize(user)) {
-            suil::http::Jwt jwt;
-            jwt.aud(user.peek());
-            jwt.roles(it->second.roles);
-            if (jwtSession.authorize(std::move(jwt))) {
-                // DON'T DO THIS AT HOME
-                res << ep.context<hs::JwtAuthorization>(req).token();
-            }
-        }
+        // body will be cleared after response
+        res.chunk({const_cast<char *>(req.body().data()), req.body().size(), 0});
     });
 
-    // Add a secure route
-    // accepts PUT http methods
-    // Only users authorized and belonging to software group are allowed
-    Route(ep, "/modify/{string}/{int}")
-    ("PUT"_method, "OPTIONS"_method)
-    .attrs(opt(Authorize, hs::Auth{"software"_str}))
-    ([&](const hs::Request& req, hs::Response& resp, suil::String key, int id) {
-        auto& jwtAuth = ep.context<hs::JwtAuthorization>(req);
-        scoped(conn, ep.context<hs::RedisMiddleware>(req).conn());
-        conn.hset(jwtAuth.jwt().aud(), key, id);
+    Route(ep, "/echo/2")
+    ("GET"_method, "OPTIONS"_method)
+    .attrs(opt(ReplyType, "text/plain"))
+    ([&](const hs::Request& req, hs::Response& res) {
+        // body will be cleared after response
+        res << req.body();
+    });
+
+    Route(ep, "/hello")
+    ("GET"_method, "OPTIONS"_method)
+    .attrs(opt(ReplyType, "text/plain"))
+    ([&]() {
+        // body will be cleared after response
+        return suil::String{"Hello World"};
+    });
+
+    Route(ep, "/whoami/{string}")
+    ("GET"_method, "OPTIONS"_method)
+    .attrs(opt(ReplyType, "text/plain"))
+    ([&](suil::String name) {
+        // body will be cleared after response
+        return suil::catstr("Hello ", name);
     });
 
     return ep.start();

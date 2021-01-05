@@ -25,6 +25,12 @@
 #pragma symbol Upper
 #pragma symbol Lower
 
+#pragma symbol allowCompress
+#pragma symbol allowCaching
+#pragma symbol allowRange
+#pragma symbol allowSendFile
+#pragma symbol cacheExpires
+
 namespace suil::http::server {
 
     struct [[gen::sbg(json)]] HttpServerConfig {
@@ -46,5 +52,16 @@ namespace suil::http::server {
         uint64    txBytes{0};
         uint64    openRequests{0};
         uint64    totalRequests{0};
+    };
+
+    struct [[gen::sbg(json)]] FileServerConfig {
+        int64   reloadFileTimeout{15_sec};
+        size_t  compressMin{16_Kib};
+        bool    enableSendFile{true};
+        int64   cacheExpires{12_hr};
+        int64   maxCacheSize{4_Gib};
+        size_t  mappedMin{16_Kib};
+        String  root{"./www"};
+        String  route{"/"};
     };
 }

@@ -108,6 +108,7 @@ if (ENABLE_UNIT_TESTS)
     set_target_properties(SuilNet-UnitTest
             PROPERTIES
             RUNTIME_OUTPUT_NAME net_unittest)
+    add_dependencies(SuilNet-UnitTest SuilNet-scc)
 endif()
 
 include(example/.cmake)

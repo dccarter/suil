@@ -11,6 +11,7 @@ set(SUIL_HTTP_SERVER_SOURCES
         src/server/cors.cpp
         src/server/endpoint.cpp
         src/server/form.cpp
+        src/server/fserver.cpp
         src/server/initializer.cpp
         src/server/jwtauth.cpp
         src/server/jwtsession.cpp

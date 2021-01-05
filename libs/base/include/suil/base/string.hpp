@@ -316,8 +316,9 @@ namespace suil {
          * @return true this string starts with the given string, false otherwise
          */
         inline bool startsWith(const String& s, bool igc = false) const {
-            auto len = std::min(Ego.m_len, s.m_len);
-            return igc? strncasecmp(Ego.m_cstr, s.m_cstr, len) == 0 : strncmp(Ego.m_cstr, s.m_cstr, len) == 0;
+            if (Ego.m_len < s.m_len) return false;
+            return igc? strncasecmp(Ego.m_cstr, s.m_cstr, s.m_len) == 0 :
+                        strncmp(Ego.m_cstr, s.m_cstr, s.m_len) == 0;
         }
 
         /**
