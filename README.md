@@ -2,7 +2,7 @@
 A lightweight mordern `C++` micro framework with lots of goodies packaged in various libraries
 
 ```c++
-#include <suil/hpp/server/endpoint.hpp>
+#include <suil/server/endpoint.hpp>
 #include <suil/base/logging.hpp>
 
 #include <cstddef>
@@ -36,6 +36,44 @@ int main(int argc, char *argv[])
     
     return ep.start();
 }
+```
+
+### Benchmarking (in progress)
+This will be done right once the docs site is done. But for an overview,
+testing on my laptop yields the following results
+##### Environment
+* Ubuntu 20.04.1 LTS (application running on docker container)
+* Lenovo T460s Intel(R) Core(TM) i7-6600U CPU @ 2.60GHz
+  - 2 cores, 2 threads
+  - 12Gb RAM
+* [wrk2](https://github.com/giltene/wrk2) master running on same machine
+
+#### Application output
+```shell
+curl -i http://localhost:8000/hello ; echo
+HTTP/1.1 200 OK
+Connection: Keep-Alive
+KeepAlive: 300000
+Strict-Transport-Security: max-age 3600; includeSubdomains
+Content-Type: application/json
+Server: Suil-Http-Server
+Date: Tue, 05 Jan 2021 07:17:10 GMT
+Content-Length: 11
+
+Hello World
+```
+
+#### Benchmark results
+```bash
+wrk -R1M  -c127 http://localhost:8000/hello
+Running 10s test @ http://localhost:8000/hello
+  2 threads and 127 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     4.27s     2.71s    9.47s    56.86%
+    Req/Sec       -nan      -nan   0.00      0.00%
+  444196 requests in 10.00s, 102.52MB read
+Requests/sec:  44420.97
+Transfer/sec:     10.25MB
 ```
 
 ### Supported Features
