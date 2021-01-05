@@ -138,6 +138,10 @@ namespace suil::http::server {
             return Ego._ctx->_router;
         }
 
+        inline const Router& router() const {
+            return Ego._ctx->_router;
+        }
+
     private:
         Backend& backend() {
             if (!Ego._backend) {

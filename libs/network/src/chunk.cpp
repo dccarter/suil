@@ -35,7 +35,7 @@ namespace suil::net {
         Ego._data.ptr = data;
         if (dctor) {
             Ego._dctor = [d = std::move(dctor)](Chunk& c) {
-                if (c._data.fd > 0) {
+                if (c._data.ptr != nullptr) {
                     d(c._data.ptr);
                 }
             };
@@ -43,27 +43,24 @@ namespace suil::net {
     }
 
     Chunk::Chunk(Chunk&& other) noexcept
-        : _useFd{other._useFd},
-          _off{other._off},
-          _len{other._len},
-          _dctor{std::move(other._dctor)}
+        : _useFd{std::exchange(other._useFd, -1)},
+          _off{std::exchange(other._off, 0)},
+          _len{std::exchange(other._len, 0)},
+          _dctor{std::exchange(other._dctor, nullptr)}
     {
-        Ego._data.ptr = other._data.ptr;
-        other._data.ptr = nullptr;
-        other._off = 0;
-        other._len = 0;
+        Ego._data.ptr = std::exchange(other._data.ptr, nullptr);
     }
 
     Chunk& Chunk::operator=(Chunk&& other) noexcept
     {
-        Ego._useFd = other._useFd;
-        Ego._off = other._off;
-        Ego._len = other._len;
-        Ego._dctor = std::move(other._dctor);
-        Ego._data.ptr = other._data.ptr;
-        other._data.ptr = nullptr;
-        other._off = 0;
-        other._len = 0;
+        if (this == &other) {
+            return Ego;
+        }
+        Ego._useFd = std::exchange(other._useFd, -1);
+        Ego._off   = std::exchange(other._off, 0);
+        Ego._len   = other._len;
+        Ego._dctor = std::exchange(other._dctor, nullptr);
+        Ego._data.ptr = std::exchange(other._data.ptr, nullptr);
         return Ego;
     }
 

@@ -21,6 +21,7 @@ set(SUIL_BASE_SOURCES
         src/logging.cpp
         src/mime.cpp
         src/mustache.cpp
+        src/notify.cpp
         src/process.cpp
         src/regex.cpp
         src/result.cpp
@@ -84,6 +85,7 @@ install(EXPORT      ${TARGETS_EXPORT_NAME}
 
 
 include(generator/.cmake)
+include(examples/.cmake)
 
 if (ENABLE_UNIT_TESTS)
     include_directories(test)

@@ -3,7 +3,7 @@
 //
 
 #include "suil/http/server/router.hpp"
-
+#include <iostream>
 #ifndef SUIL_FILE_SERVER_ROUTE
 #define SUIL_FILE_SERVER_ROUTE "1b7647618ea63937daae8ebb903e9175"
 #endif

@@ -25,7 +25,7 @@ namespace suil {
      * published on an observable
      */
     template <typename R, typename... Args>
-        requires std::is_void_v<R>
+        requires (std::is_void_v<R> or std::is_same_v<R, bool>)
     class Connection<R(Args...)> {
     public:
         using Func = std::function<R(Args...)>;
@@ -55,10 +55,17 @@ namespace suil {
                 : fn{std::move(func)}
             {}
 
-            void operator()(Args... args)
+            R operator()(Args... args)
             {
                 if (fn) {
-                    std::invoke(fn, args...);
+                    if constexpr (std::is_same_v<bool, R>) {
+                        return std::invoke(fn, args...);
+                    } else {
+                        std::invoke(fn, args...);
+                    }
+                }
+                if constexpr (std::is_same_v<bool, R>) {
+                    return false;
                 }
             }
 
@@ -74,7 +81,7 @@ namespace suil {
      * of this type
      */
     template <typename R, typename... Args>
-        requires std::is_void_v<R>
+        requires (std::is_void_v<R> or std::is_same_v<R, bool>)
     class Signal<R(Args...)> {
         using Callback = std::weak_ptr<typename Connection<R(Args...)>::Function>;
         using LifeTimeObserver = std::shared_ptr<Connection<R(Args...)>>;
@@ -153,7 +160,15 @@ namespace suil {
                 // invoke all callbacks
                 auto& cb = *it;
                 if (auto callback = cb.lock()) {
-                    (*callback)(args...);
+                    if constexpr (std::is_same_v<R, bool>) {
+                        if (!(*callback)(args...)) {
+                            // aborted by delegate
+                            break;
+                        }
+                    }
+                    else {
+                        (*callback)(args...);
+                    }
                     it = std::next(it, 1);
                     continue;
                 }

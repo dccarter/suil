@@ -192,12 +192,12 @@ namespace server {
         void setContentType(String type);
         void clear();
         void clearContent();
+        void chunk(net::Chunk chunk);
 
     private suil_ut:
         DISABLE_COPY(Response);
         inline ProtocolUpgrade& operator()() { return Ego._upgrade; }
         void flushCookies();
-        void chunk(net::Chunk chunk);
         friend class ConnectionImpl;
         std::vector<net::Chunk> _chunks{};
         std::size_t _chunksSize{0};
