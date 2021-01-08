@@ -535,15 +535,18 @@ namespace suil {
         friend
         Wire& operator>>(Wire& w, String& s);
 
-        friend struct hasher;
         union {
             char  *m_str;
             const char *m_cstr;
         };
 
+        template <DataBuf T>
+        friend struct Hasher;
+
+        friend struct HasherCaseInsensitive;
         uint32_t m_len{0};
         bool     m_own{false};
-        size_t   m_hash{0};
+        mutable size_t   m_hash{0};
     };
 
     /**
@@ -582,11 +585,44 @@ namespace suil {
     struct CaseInsensitive {
         inline bool operator()(const String& l, const String& r) const
         {
-            if (l.data() != nullptr) {
-                return ((l.data() == r.data()) && (l.size() == r.size())) ||
-                       (strncasecmp(l.data(), r.data(), std::min(l.size(), r.size())) == 0);
+            return l.compare(r, true) == 0;
+        }
+    };
+
+    struct HasherCaseInsensitive {
+        size_t operator()(const String& key) const {
+            constexpr auto init = std::size_t((sizeof(std::size_t) == 8) ? 0xcbf29ce484222325 : 0x811c9dc5);
+            constexpr auto multiplier = std::size_t((sizeof(std::size_t) == 8) ? 0x100000001b3 : 0x1000193);
+            if (key.m_hash != 0) {
+                return key.m_hash;
             }
-            return (l.data() == r.data()) && (l.size() == r.size());
+
+            std::size_t hash = init;
+            for (char i : key) {
+                hash ^= ::toupper(i);
+                hash *= multiplier;
+            }
+            key.m_hash = hash;
+            return hash;
+        }
+    };
+
+    template <>
+    struct Hasher<String> {
+        inline size_t operator()(const String& key) const {
+            constexpr auto init = std::size_t((sizeof(std::size_t) == 8) ? 0xcbf29ce484222325 : 0x811c9dc5);
+            constexpr auto multiplier = std::size_t((sizeof(std::size_t) == 8) ? 0x100000001b3 : 0x1000193);
+            if (key.m_hash != 0) {
+                return key.m_hash;
+            }
+
+            std::size_t hash = init;
+            for (char i : key) {
+                hash ^= i;
+                hash *= multiplier;
+            }
+            key.m_hash = hash;
+            return hash;
         }
     };
 
@@ -596,8 +632,17 @@ namespace suil {
      * @tparam T the type of data held in the map
      * @tparam Cs the equality comparison of the map keys
      */
-    template <typename T, typename Cs = CaseSensitive>
-    using UnorderedMap = std::unordered_map<String, T, Hasher<String>, Cs>;
+    template <typename T, typename Hs = Hasher<String>, typename Cs = CaseSensitive>
+    using UnorderedMap = std::unordered_map<String, T, Hs, Cs>;
+
+    /**
+     * Definition of an unordered \class String keyed map
+     *
+     * @tparam T the type of data held in the map
+     * @tparam Cs the equality comparison of the map keys
+     */
+    template <typename T, typename Hs = Hasher<String>, typename Cs = CaseSensitive>
+    using UnorderedMultiMap = std::unordered_multimap<String, T, Hs, Cs>;
 
     /**
      * Definition of an ordered \class String keyed map
@@ -605,8 +650,8 @@ namespace suil {
      * @tparam T the type of data held in the map
      * @tparam Cs the equality comparison of the map keys
      */
-    template <typename T, typename Cs = CaseSensitive>
-    using Map = std::map<String, T, Hasher<String>, Cs>;
+    template <typename T, typename Hs = Hasher<String>, typename Cs = CaseSensitive>
+    using Map = std::map<String, T, Hs, Cs>;
 
     /**
      * @brief Converts a string to a decimal number. Floating point

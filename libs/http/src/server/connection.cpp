@@ -95,9 +95,9 @@ namespace suil::http::server {
 
             itrace("\"%s " PRIs " HTTP/%u.%u\" %u - %lu ms",
                    http::toString(Method(req.method))(), _PRIs(req.url()),
-                   req.http_major, req.http_minor, resp._status, (mnow()-start));
+                   req.major_version, req.minor_version, resp._status, (mnow()-start));
 
-            req.clear();
+            req.reset();
             resp.clear();
         } while (!Ego._close);
 
@@ -219,7 +219,7 @@ namespace suil::http::server {
                     auto chunk = std::min(Ego._config.sendChunk, b.size() - sent);
                     rc = Ego._sock.sendfile(
                             b.fd(),
-                            (b.offset() + sent),
+                            (b.begin() + sent),
                             chunk,
                             Ego._config.connectionTimeout);
                     if (rc == 0 || rc != chunk) {

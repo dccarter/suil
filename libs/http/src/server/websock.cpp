@@ -147,7 +147,7 @@ namespace suil::http {
         resp.end(
         [&api, size, created = std::move(onSockCreated)](server::Request &rq, server::Response &rs) {
             // clear the Request to free resources
-            rq.clear();
+            rq.reset();
 
             // Create a web socket
             WebSock ws(rq.sock(), api, size);

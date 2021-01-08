@@ -8,7 +8,7 @@ namespace suil {
 
     const char* mimetype(const String& filename) {
         const char *ext = strrchr(filename.data(), '.');
-        static UnorderedMap<const char*, CaseSensitive> MIME_TYPES = {
+        static UnorderedMap<const char*, HasherCaseInsensitive, CaseSensitive> MIME_TYPES = {
             {".html", "text/html"},
             {".css",  "text/css"},
             {".csv",  "text/csv"},

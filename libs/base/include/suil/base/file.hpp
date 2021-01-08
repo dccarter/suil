@@ -108,19 +108,19 @@ namespace suil {
                 size_t& size,
                 const Deadline& dd = Deadline::infinite());
         /**
-         * file seek to given offset
-         * @param off the offset to seek to
+         * file seek to given begin
+         * @param off the begin to seek to
          * @return the new position in file
          */
         virtual off_t  seek(off_t off);
         /**
-         * get the offset on the file
-         * @return the current offset on the file
+         * get the begin on the file
+         * @return the current begin on the file
          */
         virtual off_t  tell();
         /**
-         * check if the offset is at the end of file
-         * @return true if offset at end of file
+         * check if the begin is at the end of file
+         * @return true if begin at end of file
          */
         virtual bool   eof();
         /**

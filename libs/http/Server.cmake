@@ -38,7 +38,7 @@ add_library(SuilHttpServer STATIC
         ${SUIL_HTTP_SERVER_SOURCES})
 
 target_link_libraries(SuilHttpServer
-        SuilNet SuilDb SuilBase mill ${OPENSSL_LIBRARIES})
+        SuilNet SuilDb SuilBase mill picohttp ${OPENSSL_LIBRARIES})
 
 if (ENABLE_UNIT_TESTS)
     include_directories(test)

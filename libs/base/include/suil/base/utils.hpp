@@ -14,6 +14,7 @@
 #include <string_view>
 #include <cstring>
 #include <concepts>
+#include <cctype>
 
 #ifndef suil_ut
 #define suil_ut
@@ -385,50 +386,6 @@ namespace suil {
         }
     };
 
-    /**
-     * Duplicate the given buffer to a new buffer. This is similar to
-     * strndup but uses C++ new operator to allocate the new buffer
-     *
-     * @tparam T the type of buffer to duplicate
-     * @param s the buffer that will be duplicated
-     * @param sz the size of the buffer to duplicate
-     * @return a newly allocated copy of the given data that should
-     * be deleted with delete[]
-     */
-    template <typename T = char>
-    auto duplicate(const T* s, size_t sz) -> T* {
-        if (s == nullptr || sz == 0) return nullptr;
-        auto size{sz};
-        if constexpr (std::is_same_v<T, char>)
-            size += 1;
-        auto* d = new T[size];
-        memcpy(d, s, sizeof(T)*sz);
-        if constexpr (std::is_same_v<T, char>)
-            d[sz] = '\0';
-        return d;
-    }
-
-    /**
-     * Reallocates the given buffer to a new memory segment with the given
-     * size. If \param os is greater than \param ns then there will be no
-     * allocation and source buffer will be returned.
-     *
-     * @tparam T the type of objects held in the buffer
-     * @param s the buffer to reallocate. If valid, this buffer will be deleted on return
-     * @param os the number of objects in the buffer to reallocate
-     * @param ns the size of the new buffer
-     * @return a new buffer of size \param ns which has objects previously held
-     * in \s.
-     */
-    template <typename T = char>
-    auto reallocate(T* s, size_t os, size_t ns) -> T* {
-        if (ns == 0)
-            return nullptr;
-        if (os > ns) {
-            return s;
-        }
-        return static_cast<T *>(std::realloc(s, ns));
-    }
 
     /**
      * Find the occurrence of a group of bytes \param needle in the given

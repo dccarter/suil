@@ -354,15 +354,15 @@ namespace suil {
         void reset(size_t size, bool keep = false);
 
         /**
-         * move offset forward by \param off bytes
-         * @param off the number of bytes to offset, if the operation exceeds the current
+         * move begin forward by \param off bytes
+         * @param off the number of bytes to begin, if the operation exceeds the current
          * buffer size, the buffer will grow
          */
         void seek(off_t off);
 
         /**
-         * move offset to to 0 and move forward by \param off bytes
-         * @param off the number of bytes to offset, if the operation exceeds the current
+         * move begin to to 0 and move forward by \param off bytes
+         * @param off the number of bytes to begin, if the operation exceeds the current
          * buffer size, the buffer will grow
          */
         void bseek(off_t off);
@@ -531,7 +531,7 @@ namespace suil {
          * @return
          */
         inline Buffer&  operator<<(const bool u) {
-            if (u) appendf("true"); else append("false");
+            if (u) append("true"); else append("false");
             return *this;
         }
 

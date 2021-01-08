@@ -12,8 +12,12 @@ namespace suil::http::server {
 
     Request::Request(net::Socket& sock, HttpServerConfig& config)
         : _sock{sock},
-          _config{config}
-    {}
+          _config{config},
+          _hl(_headers, nullptr),
+          _parserCb{*this}
+    {
+        reset();
+    }
 
     const char* Request::ip() const
     {
@@ -30,12 +34,7 @@ namespace suil::http::server {
 
     const String& Request::header(const String& name) const
     {
-        auto it = Ego._headers.find(name);
-        if (it == Ego._headers.end()) {
-            static String Invalid{};
-            return Invalid;
-        }
-        return it->second;
+        return _hl[name];
     }
 
     const String & Request::cookie(const String& name) const {
@@ -58,7 +57,7 @@ namespace suil::http::server {
 
     strview Request::body() const
     {
-        if (!Ego.isValid()) {
+        if (!Ego.isValid() or (_flags.hasBody == 0)) {
             return {};
         }
 
@@ -66,7 +65,8 @@ namespace suil::http::server {
             return Ego._offload.data();
         }
         else {
-            return {Ego._stage.data(), Ego._stage.size()};
+            auto& bc = _chunks[_bodyChunk];
+            return String{&bc.data<char>()[_bodyChunkOffset], bc.size()-_bodyChunkOffset-1, false};
         }
     }
 
@@ -77,9 +77,9 @@ namespace suil::http::server {
         return *Ego.params().attrs;
     }
 
-    void Request::clear(bool internal)
+    void Request::reset()
     {
-        HttpParser::clear(internal);
+        ParserT::reset();
         Ego._form.clear();
         Ego._cookies.clear();
         Ego._offload.close();
@@ -88,19 +88,28 @@ namespace suil::http::server {
         Ego._bodyOffset = 0;
         memset(&Ego._flags, 0, sizeof(Ego._flags));
         Ego._params.clear();
+        _chunks.clear();
+        _body.clear();
     }
 
-    int Request::onUrl(String&& url)
+    int Request::onUrl(std::string_view url)
     {
-        auto pos = url.find('?');
+        String tmp{url.data(), url.size(), false};
+        auto pos = tmp.find('?');
         if (pos != -1) {
-            Ego._qps = QueryString{url.substr(pos)};
-            Ego._url = url.substr(0, pos, false);
+            Ego._qps = QueryString{tmp.substr(pos)};
+            Ego._url = tmp.substr(0, pos, false);
         }
         else {
-            Ego._url = std::move(url);
+            Ego._url = std::move(tmp);
         }
 
+        return 0;
+    }
+
+    int Request::onHeader(std::string_view name, std::string_view value)
+    {
+        _headers.emplace(String{name}, String{value});
         return 0;
     }
 
@@ -451,10 +460,12 @@ namespace suil::http::server {
     Status Request::receiveHeaders(HttpServerStats& stats)
     {
         Ego._status = http::Ok;
-        char stage[2048];
+        int idx{0};
+        _chunks.emplace_back(4096); // allocate chunks of 4K
         do {
-            auto len = sizeof(stage);
-            if (!sock().read(stage, len, Ego._config.connectionTimeout)) {
+            auto& stage = _chunks.back();
+            auto len = stage.capacity();
+            if (!sock().read(&stage[stage.size()], len, Ego._config.connectionTimeout)) {
                 if (errno) {
                     idebug("Request::receiveHeaders(%s) receiving headers failed: %s",
                            sock().id(), errno_s);
@@ -462,29 +473,71 @@ namespace suil::http::server {
                 Ego._status = (errno == ETIMEDOUT) ? http::RequestTimeout : http::InternalError;
                 break;
             }
+            stage.seek(len);
             stats.rxBytes += len;
+            bool cont{false};
+            if (idx >= 3) {
+                idx -= 3;
+                cont = true;
+            }
 
-            if (!Ego.feed(stage, len)) {
-                if (Ego._status == http::Ok)
-                    Ego._status = http::BadRequest;
+            idx = Ego.feed(&stage.data<char>()[idx], len, cont);
+            if (unlikely(idx < 0)) {
+                // parsing headers failed
+                _status = http::BadRequest;
+                itrace("Request::receiveHeaders(%s) parsing headers failed", sock().id());
                 break;
             }
-        } while (Ego._headersComplete == 0);
+            if (_flags.headersDone) {
+                // we are done parsing parsing headers
+                _bodyChunk  = _chunks.size()-1;
+                _bodyOffset = len;
+                break;
+            }
+
+            if (idx != stage.size()) {
+                // parser still needs more data to complete parsing headers
+                if (stage.capacity() > ((stage.size() - idx) + 1024)) {
+                    // there is still room in the staging chunk
+                    continue;
+                }
+            }
+            // current chunk and move on to a new one
+            auto unconsumed = stage.size() - idx;
+            _chunks.emplace_back(unconsumed + 4096);
+            auto& tmp = _chunks.back();
+            memcpy(&tmp[0], &_chunks[_chunks.size()-2][idx], unconsumed);
+            tmp.seek(unconsumed);
+            idx = 0;
+        } while (Ego._flags.headersDone == 0);
 
         return Ego._status;
     }
 
     Status Request::receiveBody(HttpServerStats& stats)
     {
-        if (Ego._bodyComplete) {
+        if (Ego._flags.bodyComplete) {
             return Ego._status;
         }
 
-        char stage[8192];
-        size_t len = 0, left = content_length;
+        struct phr_chunked_decoder decoder{0, 0, 0, 0};
+        if (_bodyChunkOffset > 0) {
+            _flags.hasBody = true;
+            auto& chunk = _chunks[_bodyChunk];
+            auto size = chunk.size() - _bodyChunkOffset;
+            _body.reserve(std::max(size, size_t(content_length)));
+            _body.append(&chunk.data<char>()[_bodyChunkOffset], size);
+        }
+        size_t len = 0, left = content_length-_body.size();
+        if (left == 0) {
+            _flags.bodyComplete = true;
+            return _status;
+        }
+
+        _body.reserve(left);
         do {
-            len = std::min(sizeof(stage), left);
-            if (!sock().receive(stage, len, Ego._config.connectionTimeout)) {
+            len = std::min(size_t(4096), left);
+            if (!sock().receive(&_body[_body.size()], len, Ego._config.connectionTimeout)) {
                 itrace("Request::receiveBody(%s) receive body failed: %s",
                        sock().id(), errno_s);
                 Ego._status = (errno == ETIMEDOUT)? http::RequestTimeout : http::InternalError;
@@ -492,18 +545,10 @@ namespace suil::http::server {
                 break;
             }
             stats.rxBytes += len;
-
-            if (!feed(stage, len)) {
-                if (Ego._status == http::Ok)
-                    Ego._status = http::BadRequest;
-                Ego._flags.bodyError = 1;
-                break;
-            }
-
             left -= len;
-        } while (Ego._bodyComplete == 0);
+        } while (left > 0);
 
-        if ((Ego._status == http::Ok) and (Ego._bodyComplete == 0)) {
+        if ((Ego._status == http::Ok) and (Ego._flags.bodyComplete == 0)) {
             itrace("Request::receiveBody(%s) parsing failed, body incomplete",
                    sock().id());
             Ego._flags.bodyError = 1;
@@ -513,7 +558,37 @@ namespace suil::http::server {
         return Ego._status;
     }
 
-    int Request::onBodyPart(const String& part)
+    int Request::feed(const char* buf, size_t& len, bool  cont)
+    {
+        auto consumed = phr_parse_request(
+                buf,
+                len,
+                this,
+                &picohttp::RequestParserCb::Instance,
+                cont? 3: 0);
+        if (consumed == -1) {
+            // parsing request failed
+            throw HttpError(http::BadRequest);
+        }
+
+        if (consumed == -2) {
+            // this means that the parser thinks this is a partial request
+            if (minor_version == -1) {
+                // start line was partial, read more and restart
+                return 0;
+            }
+            else {
+                // parsing headers of partial, need to read more
+                return rewind;
+            }
+        }
+        // parser is done and there is left over data is assumed to be body
+        len = len-consumed;
+        _flags.headersDone = 1;
+        return 0;
+    }
+
+    int Request::onBodyPart(strview part)
     {
         if (Ego._flags.bodyOffload and Ego._offload.valid()) {
             // offload body to file
@@ -522,15 +597,14 @@ namespace suil::http::server {
                 idebug("Request::onBodyPart(%s) offload %zu bytes failed: %s",
                        sock().id(), part.size(), errno_s);
                 Ego._flags.offloadError = 1;
-                return -HPE_INTERNAL;
+                return -1;
             }
         }
         else {
-            // append received part to buffer
-            return HttpParser::onBodyPart(part);
+            _body.append(part);
         }
 
-        return HPE_OK;
+        return 0;
     }
 
     size_t Request::readBody(void* buf, size_t len)
@@ -559,8 +633,8 @@ namespace suil::http::server {
         }
         else {
             // just copy from buffer
-            auto maxRead = std::min(len, Ego._stage.size() - Ego._bodyOffset);
-            memcpy(buf, &Ego._stage.data()[Ego._bodyOffset], maxRead);
+            auto maxRead = std::min(len, Ego._body.size() - Ego._bodyOffset);
+            memcpy(buf, &Ego._body.data()[Ego._bodyOffset], maxRead);
             Ego._bodyOffset += maxRead;
             return maxRead;
         }
@@ -580,42 +654,7 @@ namespace suil::http::server {
             return data;
         }
         else {
-            return Ego._stage.cdata();
+            return Ego._body.cdata();
         }
-    }
-
-    int Request::onMessageComplete()
-    {
-        Ego._flags.hasBody  = Ego.content_length != 0;
-        return HttpParser::onMessageComplete();
-    }
-
-    int Request::onHeadersComplete()
-    {
-        if (Ego._headers.contains("Content-Length")) {
-            if (Ego.content_length > _config.maxBodyLen) {
-                idebug("Request::processHeaders(%s) request to large: %d",
-                       sock().id(), content_length);
-                Ego._status = http::RequestEntityTooLarge;
-                return -HPE_INTERNAL;
-            }
-            Ego._flags.hasBody = 1;
-        }
-
-        if (Ego._flags.hasBody and Ego._config.diskOffload and
-            (Ego.content_length > Ego._config.diskOffloadMin))
-        {
-            auto path = suil::catstr(Ego._config.offloadDir, "/http_body.", Ego.sOffloadIndex++);
-            if (!Ego._offload.open(path, O_CREAT|O_RDWR, 0755)) {
-                idebug("Request::processHeaders(%s) opening offload path %s failed: %s",
-                       sock().id(), path(), errno_s);
-                Ego._status = http::InternalError;
-                Ego._flags.offloadError = 1;
-                return -HPE_INTERNAL;
-            }
-            Ego._flags.bodyOffload = 1;
-        }
-
-        return HPE_OK;
     }
 }

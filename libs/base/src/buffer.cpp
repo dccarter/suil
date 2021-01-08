@@ -7,7 +7,7 @@
 #include "suil/base/exception.hpp"
 #include "suil/base/datetime.hpp"
 #include "suil/base/string.hpp"
-
+#include <fmt/core.h>
 #include <algorithm>
 #include <cstdarg>
 
@@ -57,10 +57,10 @@ namespace suil {
     Buffer::~Buffer() {
         if (m_data != nullptr) {
             free(m_data);
+            m_data = nullptr;
+            m_size = 0;
+            m_offset = 0;
         }
-        m_data = nullptr;
-        m_size = 0;
-        m_offset = 0;
     }
 
     ssize_t Buffer::appendf(const char *fmt, ...) {
@@ -140,7 +140,7 @@ namespace suil {
             return;
         }
         add += __ALIGN(add);
-        m_data = reallocate(m_data, m_size,(m_size+add+1));
+        m_data = static_cast<uint8 *>(realloc(m_data, m_size+add+1));
         if (m_data == nullptr)
             throw MemoryAllocationFailure(
                     "Buffer::grow failed ", errno_s);
@@ -153,7 +153,7 @@ namespace suil {
         if (!keep || (m_size < size)) {
             size = (size < 8) ? 8 : size;
             size += __ALIGN(size);
-            m_data = reallocate(m_data, m_size,(size+1));
+            m_data = static_cast<uint8 *>(realloc(m_data, size+1));
             if (m_data == nullptr)
                 throw MemoryAllocationFailure(
                         "Buffer::grow failed ", errno_s);
@@ -172,7 +172,7 @@ namespace suil {
             m_offset = (uint32_t) off;
         }
         else {
-            throw OutOfRange("Buffer::bseek - seek offset out of range");
+            throw OutOfRange("Buffer::bseek - seek begin out of range");
         }
     }
 

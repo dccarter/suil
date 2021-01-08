@@ -18,13 +18,19 @@
 #include <suil/base/file.hpp>
 #include <suil/base/logging.hpp>
 #include <suil/net/socket.hpp>
+#include <suil/net/chunk.hpp>
+
+#include <picohttp/parser.hpp>
 
 namespace suil::http::server {
 
     define_log_tag(HTTP_REQ);
 
-    class Request : public HttpParser, public LOGGER(HTTP_REQ) {
+    class Request : public picohttp::Parser<picohttp::request_ctx>, public LOGGER(HTTP_REQ) {
     public:
+        using ParserT = picohttp::Parser<picohttp::request_ctx>;
+        using Headers = UnorderedMultiMap<String, HasherCaseInsensitive, CaseInsensitive>;
+
         const char *ip() const;
         int port() const;
         net::Socket& sock();
@@ -40,9 +46,13 @@ namespace suil::http::server {
 
         const String& cookie(const String& name) const;
 
-        inline const UnorderedMap<String, CaseInsensitive>& headers() const {
+        inline const Headers& headers() const {
             return Ego._headers;
         }
+
+//        const auto headers(const String& name) const {
+//            return _hl(name);
+//        }
 
         inline const Form& form() const {
             return Ego._form;
@@ -59,7 +69,8 @@ namespace suil::http::server {
         template <typename T>
         inline void toJson(T& o) const {
             if (!Ego._flags.bodyOffload) {
-                json::decode(Ego._stage, o);
+                auto tmp = Ego.body();
+                json::decode(tmp, o);
             }
             else {
                 auto data = Ego._offload.data();
@@ -89,18 +100,17 @@ namespace suil::http::server {
             return Method(Ego.method);
         }
 
-        void clear(bool internal = false) override;
+        void reset() override;
 
         void *middlewareContent{nullptr};
 
-    protected:
-        int onBodyPart(const String &part) override;
-        int onUrl(String &&url) override;
-        int onHeadersComplete() override;
-        int onMessageComplete() override;
+        int onBodyPart(std::string_view part) override;
+        int onUrl(std::string_view url) override;
+        int onHeader(std::string_view name, std::string_view value) override;
 
     private suil_ut:
         Request(net::Socket& sock, HttpServerConfig& config);
+        int  feed(const char* buf, size_t& len, bool cont);
         bool parseCookies();
         bool parseForm();
         bool parseUrlEncodedForm();
@@ -124,7 +134,8 @@ namespace suil::http::server {
             uint8 formPassed   : 1;
             uint8 cookiesParsed: 1;
             uint8 bodyOffload  : 1;
-            uint8 u8           : 2;
+            uint8 headersDone  : 1;
+            uint8 bodyComplete : 1;
         } _flags = {0};
 
         static uint64 sOffloadIndex;
@@ -137,11 +148,18 @@ namespace suil::http::server {
         QueryString _qps;
         net::Socket& _sock;
         HttpServerConfig& _config;
-
+        Headers _headers{};
+        std::vector<net::Chunk> _chunks{};
+        // To avoid multiple copies, data is read in chunks
+        uint32 _bodyChunk{0};
+        uint32 _bodyChunkOffset{0};
+        Buffer _body{0};
+        picohttp::HeaderLookup<String, String, HasherCaseInsensitive, CaseInsensitive> _hl;
         friend class SystemAttrs;
         friend class Router;
         friend class ConnectionImpl;
         RequestParams _params{};
+        picohttp::RequestParserCb _parserCb;
     };
 }
 #endif //SUIL_HTTP_SERVER_REQUEST_HPP

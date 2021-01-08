@@ -24,12 +24,25 @@ ExternalProject_Add(iod
         CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${EP_INSTALL_DIR}")
 set_target_properties(iod PROPERTIES EXCLUDE_FROM_ALL True)
 
+ExternalProject_Add(fmt
+        PREFIX ${EP_PREFIX}/fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG "7.1.3"
+        CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${EP_INSTALL_DIR};-DFMT_TEST=OFF")
+set_target_properties(fmt PROPERTIES EXCLUDE_FROM_ALL True)
+
+ExternalProject_Add(libpicohttp
+        PREFIX ${EP_PREFIX}/picohttp
+        GIT_REPOSITORY https://github.com/dccarter/picohttpparser.git
+        CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${EP_INSTALL_DIR};-DENABLE_UNIT_TESTS=OFF;-DENABLE_BENCHMARK=OFF;-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+set_target_properties(libpicohttp PROPERTIES EXCLUDE_FROM_ALL True)
+
 include_directories(${EP_INSTALL_DIR}/include)
 link_directories(${EP_INSTALL_DIR}/lib)
 set(CMAKE_MODULE_PATH
         ${CMAKE_MODULE_PATH} ${EP_INSTALL_DIR}/share/cmake/Modules)
 
 add_custom_target(deps
-        DEPENDS libmill catch iod)
+        DEPENDS libmill catch iod fmt libpicohttp)
 
 set_target_properties(deps PROPERTIES EXCLUDE_FROM_ALL True)

@@ -43,7 +43,7 @@ namespace suil::http {
             uint8_t _u6 : 6              = 0;
         } __attribute__((packed));
 
-        UnorderedMap<String, CaseInsensitive> _headers{};
+        UnorderedMap<String, HasherCaseInsensitive, CaseInsensitive> _headers{};
         Buffer      _stage{0};
         String      _follow;
 

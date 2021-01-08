@@ -29,7 +29,7 @@ namespace suil {
     {}
 
     String::String(const std::string &str, bool own)
-        : m_cstr(own ? duplicate(str.data(), str.size()) : str.data()),
+        : m_cstr(own ? strndup(str.data(), str.size()) : str.data()),
           m_len((uint32_t) (str.size())),
           m_own(own)
     {}
@@ -87,7 +87,7 @@ namespace suil {
     }
 
     String::String(const String &s)
-        : m_str{duplicate(s.m_str, s.m_len)},
+        : m_str{strndup(s.m_str, s.m_len)},
           m_len(s.m_len),
           m_own(true),
           m_hash(s.m_hash)
@@ -102,7 +102,7 @@ namespace suil {
             ::free(m_str);
         }
 
-        m_str  = duplicate(s.m_str, s.m_len);
+        m_str  = strndup(s.m_str, s.m_len);
         m_len  = s.m_len;
         m_own  = s.m_own;
         m_hash = s.m_hash;
@@ -112,7 +112,7 @@ namespace suil {
     String String::dup() const {
         if (m_str == nullptr || m_len == 0)
             return nullptr;
-        return std::move(String(duplicate(m_str, m_len), m_len, true));
+        return std::move(String(strndup(m_str, m_len), m_len, true));
     }
 
     String String::peek() const {
@@ -230,11 +230,13 @@ namespace suil {
     }
 
     String::~String() {
-        if (m_str && m_own) {
-            ::free(m_str);
+        if (m_str) {
+            if (m_own) {
+                ::free(m_str);
+            }
+            m_str = nullptr;
+            m_own = false;
         }
-        m_str = nullptr;
-        m_own = false;
     }
 
     String String::strip(char strip, bool ends) const {

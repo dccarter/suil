@@ -125,6 +125,6 @@ namespace suil::http {
         time_t _expires{0};
     };
 
-    using CookieJar = UnorderedMap<Cookie, CaseInsensitive>;
+    using CookieJar = UnorderedMap<Cookie, HasherCaseInsensitive, CaseInsensitive>;
 }
 #endif //SUIL_HTTP_SERVER_COOKIE_HPP

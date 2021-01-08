@@ -199,9 +199,10 @@ namespace server {
         inline ProtocolUpgrade& operator()() { return Ego._upgrade; }
         void flushCookies();
         friend class ConnectionImpl;
+        friend class FileServer;
         std::vector<net::Chunk> _chunks{};
         std::size_t _chunksSize{0};
-        UnorderedMap<String, CaseInsensitive> _headers{};
+        UnorderedMap<String, HasherCaseInsensitive, CaseInsensitive> _headers{};
         CookieJar _cookies{};
         Status _status{http::Ok};
         Buffer _body{0};
