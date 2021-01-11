@@ -8,6 +8,7 @@
 #include <suil/http/server/connection.hpp>
 
 #include <suil/net/server.hpp>
+#include <suil/base/thread.hpp>
 
 namespace suil::http::server {
 
@@ -19,13 +20,42 @@ namespace suil::http::server {
     };
 
     template <typename ...Mws>
+    class EndpointContext;
+
+    template <typename... Mws>
+    class ConnectionWorker : public WorkerThread<net::Socket>, LOGGER(HTTP_SERVER) {
+    public:
+        using WorkerThread<net::Socket>::WorkerThread;
+        ConnectionWorker(
+                mill::Event& poolSync,
+                uint32 backoffLow,
+                uint32 backoffHigh,
+                std::shared_ptr<EndpointContext<Mws...>> ctx)
+            : WorkerThread<net::Socket>(poolSync, backoffLow, backoffHigh),
+              ctx{ctx}
+        {}
+
+        void executeWork(Work &work) override
+        {
+            Connection<Mws...> conn{work, ctx->_config, ctx->_router, &ctx->_mws, ctx->_stats};
+            conn.start();
+        }
+
+    private:
+        std::shared_ptr<EndpointContext<Mws...>> ctx;
+    };
+
+    template <typename ...Mws>
     class EndpointContext {
         template <typename ...M>
         friend class Endpoint;
+        template <typename... M>
+        friend class ConnectionWorker;
 
         template <typename ...Opts>
         EndpointContext(String api, Opts&&... opts)
-            : _router{std::move(api)}
+            : _router{std::move(api)},
+              _pool{"HttpConnection"}
         {
             suil::applyConfig(Ego._config, std::forward<Opts>(opts)...);
             if (Ego._config.keepAliveTime > 0) {
@@ -33,13 +63,21 @@ namespace suil::http::server {
                 Ego._config.connectionTimeout = Ego._config.keepAliveTime;
             }
             Ego._stats = HttpServerStats{};
+            _pool.setNumberOfWorkers(_config.numberOfWorkers)
+                 .setWorkerBackoffWaterMarks(
+                         _config.threadPoolBackoffHigh,
+                         _config.threadPoolBackoffLow);
         }
 
         HttpServerConfig _config{};
         HttpServerStats  _stats{};
         Router           _router;
         std::tuple<Mws...> _mws{};
+        ThreadPool<ConnectionWorker<Mws...>> _pool;
 
+        inline ThreadPool<ConnectionWorker<Mws...>>& getPool() {
+            return _pool;
+        }
     };
 
     template <typename ...Mws>
@@ -49,13 +87,13 @@ namespace suil::http::server {
         using Self = Endpoint<Mws...>;
         using Middlewares = std::tuple<Mws...>;
 
-        struct ConnectionHandler {
-            void operator()(net::Socket& sock, std::shared_ptr<Context> ctx)
+        struct ConnectionHandler : public net::BlockingHandler {
+            void operator()(net::Socket::UPtr&& sock, std::shared_ptr<Context> ctx)
             {
-                Connection<Mws...> conn{sock, ctx->_config, ctx->_router, &ctx->_mws, ctx->_stats};
-                conn.start();
+                ctx->getPool().schedule(std::move(sock));
             }
         };
+
         using Backend = net::Server<ConnectionHandler, Context>;
 
         template <typename ...Opts>
@@ -71,7 +109,8 @@ namespace suil::http::server {
             return Ego.backend().listen();
         }
 
-        inline int start() {
+        int start() {
+            _ctx->getPool().start(_ctx);
             Ego.router().validate();
             itrace("starting server....");
             return Ego.backend().start();

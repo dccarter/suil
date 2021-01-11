@@ -7,6 +7,7 @@
 
 
 #include "suil/db/orm.hpp"
+#include "redis.hpp"
 
 #include <suil/base/blob.hpp>
 #include <suil/base/channel.hpp>
@@ -1035,9 +1036,11 @@ namespace suil::db {
         bool             async{false};
         int64_t          keepAlive{-1};
         int64_t          timeout{-1};
-        Channel<uint8_t> notify{1};
-        bool          cleaning{false};
-        String        connectionStr;
+        mill::Mutex      connsMutex;
+        mill::Event      pruneEvent;
+        std::atomic_bool cleaning{false};
+        std::atomic_bool aborting{false};
+        String        connectionStr{};
         String        dbname{"public"};
     };
 }

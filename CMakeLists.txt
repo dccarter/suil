@@ -66,6 +66,9 @@ include_directories(${OpenSSL_INCLUDE_DIRS})
 find_package(PostgreSQL ${SUIL_PGSQL_VERSION} REQUIRED)
 include_directories(${PostgreSQL_INCLUDE_DIRS})
 
+# Threads needed
+find_package(Threads REQUIRED)
+
 # ZMQ is also required to build suil
 pkg_check_modules(ZeroMQ QUIET zmq)
 if (NOT ZeroMQ_FOUND)

@@ -58,7 +58,8 @@ namespace suil::net::smtp {
         char qb[1024];
         size_t len{sizeof(qb)-2};
         if (!sock.receiveUntil(qb, len, CRLF, 2, ctx.config().waitTimeout)) {
-            idebug("receiving command line failed: %s", errno_s);
+            if (errno != 0)
+                idebug("receiving command line failed: %s", errno_s);
             return (errno == ETIMEDOUT)? State::KeepAliveExceeded : State::Abort;
         }
         // drop the CRLF characters

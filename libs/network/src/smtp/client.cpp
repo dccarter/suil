@@ -527,9 +527,9 @@ namespace suil::net::smtp {
         return mTimeout;
     }
 
-    Channel<char *>& SmtpOutbox::Composed::sync()
+    mill::Event& SmtpOutbox::Composed::sync()
     {
-        return mSync;
+        return evSync;
     }
 
     SmtpOutbox::SmtpOutbox(Email::Address sender)
@@ -542,7 +542,7 @@ namespace suil::net::smtp {
           sendTimeout{timeout}
     {}
 
-    Email::Ptr SmtpOutbox::draft(const String& to, const String& subject) const
+    Email::Ptr SmtpOutbox::draft(const String& to, const String& subject)
     {
         return std::make_shared<Email>(to, subject);
     }
@@ -550,21 +550,24 @@ namespace suil::net::smtp {
     String SmtpOutbox::send(Email::Ptr email, int64_t timeout)
     {
         auto outgoing = std::make_shared<Composed>(std::move(email), timeout);
-        sendQ.push_back(outgoing);
-        if (!Ego.sending) {
+        {
+            mill::Lock lk{_mutex};
+            sendQ.push_back(outgoing);
+        }
+
+        if (!Ego._sending) {
             go(sendOutbox(Ego));
         }
 
         if (timeout > 0) {
             char *msg{nullptr};
-            outgoing->isWaiting = true;
-            if (outgoing->sync()[timeout] >> msg) {
-                outgoing->isWaiting = false;
+            outgoing->isCancelled = false;
+            if (outgoing->sync().wait(timeout)) {
                 // Composed email will be deleted by sending coroutine
-                return String{msg};
+                return std::move(outgoing->failureMsg);
             }
             else {
-                outgoing->isWaiting = false;
+                outgoing->isCancelled = true;
                 return String{"Sending email message timed out"};
             }
         }
@@ -576,28 +579,48 @@ namespace suil::net::smtp {
 
     void SmtpOutbox::sendOutbox(SmtpOutbox& Self)
     {
-        Self.sending = true;
-        while (not(Self.sendQ.empty() or Self.quiting)) {
-            auto outgoing = Self.sendQ.back();
-            Self.sendQ.pop_back();
-            char *status{nullptr};
+        Self._sending = true;
+        while (not Self.isQueueEmpty()) {
+            auto outgoing = Self.popNextQueued();
+            if (outgoing->isCancelled) {
+                ltrace(&Self, "Outgoing message cancelled, no need to send");
+                continue;
+            }
+
             try {
                 Self.client.send(outgoing->email(), Self.sender);
             }
             catch (...) {
                 auto ex = Exception::fromCurrent();
                 ldebug(&Self, "SmtpOutbox sending composed email failed: %s", ex.what());
-                status = outgoing->isWaiting? strdup(ex.what()) : nullptr;
+                if (!outgoing->isCancelled) {
+                    outgoing->failureMsg = String{ex.what()}.dup();
+                }
             }
 
-            if (outgoing->isWaiting) {
-                // waiting for email send status
-                outgoing->sync() << status;
-            }
+            // inform sender that message has been sent, if sender was waiting
+            outgoing->evSync.notify();
             yield();
         }
 
-        Self.sending = false;
+        Self._sending = false;
+    }
+
+    bool SmtpOutbox::isQueueEmpty()
+    {
+        mill::Lock lk{_mutex};
+        return quiting or sendQ.empty();
+    }
+
+    SmtpOutbox::Composed::Ptr SmtpOutbox::popNextQueued()
+    {
+        mill::Lock lk{_mutex};
+        if (sendQ.empty()) {
+            return nullptr;
+        }
+        auto ptr = std::move(sendQ.front());
+        sendQ.pop_front();
+        return ptr;
     }
 
 }

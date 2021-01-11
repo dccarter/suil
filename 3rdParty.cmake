@@ -8,7 +8,7 @@ set(EP_PREFIX  ${CMAKE_BINARY_DIR}/3rdParty)
 ExternalProject_Add(libmill
         PREFIX ${EP_PREFIX}/libmill
         GIT_REPOSITORY https://gitlab.com/sw-devel/thirdparty/libmill.git
-        CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${EP_INSTALL_DIR}")
+        CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${EP_INSTALL_DIR};-DENABLE_TESTS=OFF;-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 set_target_properties(libmill PROPERTIES EXCLUDE_FROM_ALL True)
 
 ExternalProject_Add(catch
