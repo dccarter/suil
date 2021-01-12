@@ -16,6 +16,9 @@ namespace suil::net {
     bool adaptorListen(ServerSocket& adaptor, const SocketConfig& config, int backlog);
     String getAddress(const SocketConfig& config);
 
+    struct CustomSchedulingHandler {
+    };
+
     template <typename Handler, class Context = void>
     class Server: LOGGER(SERVER) {
     public:
@@ -50,7 +53,7 @@ namespace suil::net {
             return true;
         }
 
-        int start() {
+        virtual int start() {
             if ((Adaptor == nullptr) || !Adaptor->isRunning()) {
                 // create socket adaptor
                 if (!listen()) {
@@ -62,7 +65,12 @@ namespace suil::net {
 
             while (!mExiting) {
                 if (auto sock = Adaptor->accept(mConfig.acceptTimeout)) {
-                    go(handle(Ego, std::move(sock)));
+                    if constexpr (!std::is_base_of_v<CustomSchedulingHandler, Handler>) {
+                        go(handle(Ego, std::move(sock)));
+                    }
+                    else {
+                        Handler{}(std::move(sock), *mContext);
+                    }
                 }
                 else {
                     if (errno != ETIMEDOUT) {
@@ -82,7 +90,11 @@ namespace suil::net {
             return status;
         }
 
-        void stop()
+        inline bool isRunning() const {
+            return (Adaptor != nullptr) and Adaptor->isRunning();
+        }
+
+        virtual void stop()
         {
             idebug("stopping server...");
             mExiting = true;
@@ -104,7 +116,7 @@ namespace suil::net {
         {
             Socket::UPtr tmp = std::move(sock);
             try {
-                Handler()(*tmp, Self.mContext);
+                Handler()(*tmp, *Self.mContext);
                 if (tmp->isOpen()) {
                     // close socket if still open
                     tmp->close();

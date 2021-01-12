@@ -19,6 +19,7 @@
 
 #include <list>
 #include <set>
+#include <libmill/libmill.hpp>
 
 namespace suil::net::smtp {
 
@@ -165,16 +166,17 @@ namespace suil::net::smtp {
             MOVE_CTOR(Composed);
             MOVE_ASSIGN(Composed);
 
-            Channel<char*>& sync();
+            mill::Event& sync();
             Email& email();
             int64_t timeout();
 
         private:
             friend SmtpOutbox;
             Email::Ptr  mEmail{nullptr};
-            Channel<char*> mSync{(char *)1};
+            mill::Event evSync{};
             int64_t     mTimeout{-1};
-            bool isWaiting{false};
+            std::atomic_bool isCancelled{false};
+            String      failureMsg{};
         };
     public:
         sptr(SmtpOutbox);
@@ -192,24 +194,32 @@ namespace suil::net::smtp {
 
         template <typename ...Params>
         void setup(String server, int port, Params... params) {
-            Ego.client.setup(std::move(server), port);
-            auto opts = iod::D(params...);
-            sendTimeout = opts.get(var(timeout), sendTimeout);
+            if (!_setup) {
+                mill::Lock lk{_mutex};
+                Ego.client.setup(std::move(server), port);
+                auto opts = iod::D(params...);
+                sendTimeout = opts.get(var(timeout), sendTimeout);
+                _setup = true;
+            }
         }
 
-        Email::Ptr draft(const String& to, const String& subject) const;
+        static Email::Ptr draft(const String& to, const String& subject) ;
 
         String send(Email::Ptr email, int64_t timeout = -1);
 
     private:
         static coroutine void sendOutbox(SmtpOutbox& Self);
+        bool isQueueEmpty();
+        Composed::Ptr popNextQueued();
         using SendQueue = std::list<Composed::Ptr>;
         SendQueue sendQ{};
         Client client{};
         Email::Address sender;
         std::int64_t sendTimeout{-1};
         bool quiting{false};
-        bool sending{false};
+        std::atomic_bool _sending{false};
+        std::atomic_bool _setup{false};
+        mill::Mutex _mutex;
     };
 }
 

@@ -13,6 +13,7 @@
 #include <suil/base/blob.hpp>
 #include <suil/base/exception.hpp>
 #include <suil/net/socket.hpp>
+#include <libmill/libmill.hpp>
 
 namespace suil::db {
 
@@ -470,6 +471,8 @@ namespace suil::db {
 
         const RedisClient::ServerInfo& getServerInfo();
 
+        virtual ~RedisDb();
+
     private:
         typename Clients::iterator fromCache(int db);
         typename Clients::iterator newConnection();
@@ -482,8 +485,11 @@ namespace suil::db {
         ipaddr  addr;
         RedisDbConfig config;
         RedisClient::ServerInfo serverInfo;
-        Channel<uint8_t>  notify{1};
-        bool           cleaning{false};
+        mill::Event  pruneEvt{};
+        mill::Mutex  cachedMutex{};
+        mill::Mutex  clientsMutex{};
+        std::atomic_bool cleaning{false};
+        std::atomic_bool aborting{false};
     };
 }
 

@@ -181,12 +181,14 @@ namespace suil::db {
 
     PgSqlDb::~PgSqlDb()
     {
+        aborting = true;
         if (cleaning) {
             /* unschedule the cleaning coroutine */
             itrace("notifying cleanup routine to exit");
-            !notify;
+            pruneEvent.notify();
         }
 
+        mill::Lock lk{connsMutex};
         itrace("cleaning up %lu connections", conns.size());
         auto it = conns.begin();
         while (it != conns.end()) {
@@ -194,21 +196,29 @@ namespace suil::db {
             conns.erase(it);
             it = conns.begin();
         }
+
     }
 
     PgSqlDb::Connection& PgSqlDb::connection()
     {
         PGconn *conn{nullptr};
+        mill::Lock lk{connsMutex};
         if (conns.empty()) {
             /* open a new Connection */
             int y{2};
             do {
+                lk.unlock();
                 conn = open();
-                if (conn) break;
+                if (conn != nullptr) {
+                    lk.lock();
+                    break;
+                }
                 yield();
-            } while (conns.empty() && y--);
+                lk.lock();
+            } while (conns.empty() and y--);
         }
 
+        // Still holding mutex
         if (conn == nullptr){
             // try find connection from cached list
             if(!conns.empty()){
@@ -257,17 +267,16 @@ namespace suil::db {
     {
         /* cleanup all expired connections */
         int64_t expires = db.keepAlive + 5;
+        db.cleaning = true;
+
+        mill::Lock lk{db.connsMutex};
         if (db.conns.empty())
             return;
 
-        db.cleaning = true;
-
         do {
             /* if notified to exit, exit immediately*/
-            uint8_t status{0};
-            if ((db.notify[expires] >> status)) {
-                if (status == 1) break;
-            }
+            db.pruneEvent.wait(lk, expires);
+            if (db.aborting) break;
 
             /* was not forced to exit */
             auto it = db.conns.begin();
@@ -278,7 +287,9 @@ namespace suil::db {
             ltrace(&db, "starting prune with %ld connections", db.conns.size());
             while (it != db.conns.end()) {
                 if ((*it).alive <= t) {
+                    lk.unlock();
                     (*it).cleanup();
+                    lk.lock();
                     db.conns.erase(it);
                     it = db.conns.begin();
                 } else {
@@ -288,7 +299,9 @@ namespace suil::db {
 
                 if ((++pruned % 100) == 0) {
                     /* avoid hogging the CPU */
+                    lk.unlock();
                     yield();
+                    lk.lock();
                 }
             }
             ltrace(&db, "pruned %ld connections", pruned);
@@ -298,7 +311,7 @@ namespace suil::db {
                 expires = std::max((*it).alive - t, (int64_t)3000);
             }
 
-        } while (!db.conns.empty());
+        } while (!db.conns.empty() and !db.aborting);
 
         db.cleaning = false;
     }
@@ -309,8 +322,10 @@ namespace suil::db {
         if (keepAlive != 0) {
             /* set connections keep alive */
             h.alive = mnow() + keepAlive;
-            conns.push_back(h);
-
+            {
+                mill::Lock lk{connsMutex};
+                conns.push_back(h);
+            }
             if (!cleaning && keepAlive > 0) {
                 strace("scheduling cleaning...");
                 /* schedule cleanup routine */

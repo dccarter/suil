@@ -316,21 +316,21 @@ namespace suil {
 
                 // something has been read
                 buffer[nread] = '\0';
-                String tmp{buffer, (size_t)nread, false};
+                auto tmp = String{buffer, (size_t)nread, false}.dup();
                 if (err) {
-                    if (proc.stderrCallback) {
-                        proc.stdoutCallback(tmp.dup());
+                    if (proc.onStdError) {
+                        proc.onStdError(tmp);
                     }
                     else {
-                        proc.buffer.writeError(tmp.dup());
+                        proc.buffer.writeError(std::move(tmp));
                     }
                 }
                 else {
-                    if (proc.stdoutCallback) {
-                        proc.stdoutCallback(tmp.dup());
+                    if (proc.onStdOutput) {
+                        proc.onStdOutput(tmp);
                     }
                     else {
-                        proc.buffer.writeOutput(tmp.dup());
+                        proc.buffer.writeOutput(std::move(tmp));
                     }
                 }
             } else {
@@ -346,17 +346,18 @@ namespace suil {
     void Process::flush(Process& p, OutputCallback&& rd, bool err)
     {
         if (err) {
+            p.onStdError += std::move(rd);
             while (p.buffer.hasStderr()) {
-                rd(p.buffer.readError());
+                auto msg = p.buffer.readError();
+                p.onStdError(msg);
             }
-
-            p.stderrCallback = std::move(rd);
         }
         else {
+            p.onStdOutput += std::move(rd);
             while (p.buffer.hasStdout()) {
-                rd(p.buffer.readOutput());
+                auto msg = p.buffer.readOutput();
+                p.onStdOutput(msg);
             }
-            p.stdoutCallback = std::move(rd);
         }
     }
 }

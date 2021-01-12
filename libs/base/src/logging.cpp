@@ -7,6 +7,7 @@
 #include "suil/base/datetime.hpp"
 #include "suil/base/exception.hpp"
 
+#include <libmill/libmill.h>
 #include <syslog.h>
 
 #ifdef SUIL_BACKTRACE
@@ -150,8 +151,8 @@ namespace suil {
             case Level::ERROR:
             case Level::CRITICAL:
             case Level::WARNING:
-                wr = snprintf(tmp, sz, "%s/%05d: [%s] [%3s] [%10.10s] ",
-                              name, getpid(), Datetime()(), LOGLVL_STR[(unsigned char) l],
+                wr = snprintf(tmp, sz, "%s/%05d/%02d: [%s] [%3s] [%10.10s] ",
+                              name, getpid(), mtid(), Datetime()(), LOGLVL_STR[(unsigned char) l],
                               tag);
                 break;
             default:

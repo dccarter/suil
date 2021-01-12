@@ -10,20 +10,19 @@ namespace suil::net::smtp {
 
     constexpr const char* CRLF{"\r\n"};
 
-    ServerProtocol::ServerProtocol(Socket& sock, std::shared_ptr<ServerContext> context)
+    ServerProtocol::ServerProtocol(Socket& sock, ServerContext& context)
         : sock{sock},
-          context{std::move(context)}
+          context{context}
     {}
 
     void ServerProtocol::startSession() {
-        if (context == nullptr or not context->isReady()) {
+        if (context.isReady()) {
             // server not ready
             sendLine(5000, "421 Service not available", CRLF);
             return;
         }
 
-        auto& ctx = *context;
-        auto resp = ctx.onConnect(session, sock.id());
+        auto resp = context.onConnect(session, sock.id());
         sendResponse(resp);
 
         State state{getNextState()};
@@ -53,23 +52,22 @@ namespace suil::net::smtp {
 
     ServerProtocol::State ServerProtocol::receiveCommand()
     {
-        auto& ctx = *context;
-
         char qb[1024];
         size_t len{sizeof(qb)-2};
-        if (!sock.receiveUntil(qb, len, CRLF, 2, ctx.config().waitTimeout)) {
-            idebug("receiving command line failed: %s", errno_s);
+        if (!sock.receiveUntil(qb, len, CRLF, 2, context.config().waitTimeout)) {
+            if (errno != 0)
+                idebug("receiving command line failed: %s", errno_s);
             return (errno == ETIMEDOUT)? State::KeepAliveExceeded : State::Abort;
         }
         // drop the CRLF characters
         size_t one{1};
-        sock.receiveUntil(&qb[len], one, CRLF, 2, ctx.config().waitTimeout);
+        sock.receiveUntil(&qb[len], one, CRLF, 2, context.config().waitTimeout);
         qb[--len] = '\0';
         String line{qb, len, false};
 
         auto [cmd, arg] = parseCommand(line);
 
-        auto resp = ctx.onCommand(session, cmd, arg);
+        auto resp = context.onCommand(session, cmd, arg);
         sendResponse(resp);
         if (resp.isAbort()) {
             // connection aborted by server
@@ -81,19 +79,18 @@ namespace suil::net::smtp {
 
     ServerProtocol::State ServerProtocol::receiveLine()
     {
-        auto& ctx = *context;
         char qb[1024];
         size_t len{sizeof(qb)-2};
-        if (!sock.receiveUntil(qb, len, CRLF, 2, ctx.config().waitTimeout)) {
+        if (!sock.receiveUntil(qb, len, CRLF, 2, context.config().waitTimeout)) {
             idebug("receiving data line failed: %s", errno_s);
             return (errno == ETIMEDOUT)? State::KeepAliveExceeded : State::Abort;
         }
         size_t one{1};
-        sock.receiveUntil(&qb[len], one, CRLF, 2, ctx.config().waitTimeout);
+        sock.receiveUntil(&qb[len], one, CRLF, 2, context.config().waitTimeout);
         qb[--len] = '\0';
         // drop the CRLF characters
         String str{qb, len, false};
-        auto resp = ctx.onLine(session, str);
+        auto resp = context.onLine(session, str);
         sendResponse(resp);
         if (resp.isAbort()) {
             return State::Abort;
@@ -104,18 +101,17 @@ namespace suil::net::smtp {
 
     ServerProtocol::State ServerProtocol::receiveData()
     {
-        auto& ctx = *context;
         char qb[8192], term[6];
         auto state = State::ExpectData;
         size_t totalRead{0};
         do {
             size_t len{sizeof(qb)};
-            if (!sock.read(qb, len, ctx.config().waitTimeout)) {
+            if (!sock.read(qb, len, context.config().waitTimeout)) {
                 idebug("reading data from client failed: %s", errno_s);
                 return (errno == ETIMEDOUT)? State::KeepAliveExceeded : State::Abort;
             }
             totalRead += len;
-            auto resp = ctx.onData(session, Data{qb, len, false});
+            auto resp = context.onData(session, Data{qb, len, false});
             if (resp) {
                 // All data received, send response
                 sendResponse(*resp);
@@ -222,7 +218,7 @@ namespace suil::net::smtp {
     {
         char buf[4];
         snprintf(buf, 4, "%03d", resp.code());
-        Deadline dd{context->config().sendTimeout};
+        Deadline dd{context.config().sendTimeout};
         for (const auto& line: resp.lines()) {
             if (&line == &resp.lines().back()) {
                 break;

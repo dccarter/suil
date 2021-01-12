@@ -18,7 +18,7 @@ namespace suil::rpc::srpc {
 
         Connection() = default;
 
-        void operator()(net::Socket& sock, std::shared_ptr<Context> ctx);
+        void operator()(net::Socket& sock, Context& ctx);
 
     protected:
         const RpcServerConfig& getConfig() const override;
@@ -35,7 +35,7 @@ namespace suil::rpc::srpc {
             return hb.release();
         }
 
-        std::shared_ptr<Context> context{nullptr};
+        Context* _context{nullptr};
     };
 }
 #endif //SUIL_RPC_SRPC_CONNECTION_HPP

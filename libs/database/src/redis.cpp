@@ -644,6 +644,14 @@ namespace suil::db {
           config{std::move(config)}
     {}
 
+    RedisDb::~RedisDb() noexcept
+    {
+        aborting = true;
+        if (cleaning) {
+            pruneEvt.notify();
+        }
+    }
+
     const RedisClient::ServerInfo& RedisDb::getServerInfo()
     {
         if (!serverInfo.Version) {
@@ -655,10 +663,10 @@ namespace suil::db {
     RedisClient& RedisDb::connect(int db)
     {
         auto it = fromCache(db);
-        bool fromCache{true};
-        if (it == Ego.clients.end()) {
+        bool isFromCache{true};
+        if (it == Clients::iterator{nullptr}) {
             it = newConnection();
-            fromCache = false;
+            isFromCache = false;
         }
 
         auto& cli = *it;
@@ -667,7 +675,7 @@ namespace suil::db {
             throw RedisDbError("redis - ping Request failed");
         }
 
-        if (!fromCache) {
+        if (!isFromCache) {
             itrace("changing database to %d", db);
             auto resp = cli("SELECT", db);
             if (!resp) {
@@ -681,21 +689,28 @@ namespace suil::db {
 
     typename RedisDb::Clients::iterator RedisDb::fromCache(int db)
     {
+        mill::Lock lk{cachedMutex};
         if (!Ego.cache.empty()) {
             auto handle = Ego.cache.front();
+            lk.unlock();
+
             if (handle.db != db) {
                 auto res = handle.it->send("SELECT", db);
                 if (!res) {
                     idebug("Redis SELECT on cached connection error: %s", res.error());
                     handle.alive = mnow() - 500;
-                    Ego.notify << uint8(2);
-                    return Ego.clients.end();
+                    Ego.pruneEvt.notify();
+                    // put back handle in cache, it will be cleaned up
+                    lk.lock();
+                    Ego.cache.push_front(handle);
+                    return Clients::iterator{nullptr};
                 }
             }
-            Ego.cache.pop_front();
+
             return handle.it;
         }
-        return Ego.clients.end();
+
+        return Clients::iterator{nullptr};
     }
 
     typename RedisDb::Clients::iterator RedisDb::newConnection()
@@ -717,8 +732,11 @@ namespace suil::db {
         RedisClient cli(std::move(sock), config, [&](typename Clients::iterator it, bool dctor) {
             Ego.returnConnection(it, dctor);
         });
+
+        clientsMutex.acquire();
         auto it = Ego.clients.insert(Ego.clients.cend(), std::move(cli));
         it->cacheId = it;
+        clientsMutex.release();
 
         if (config.Passwd) {
             if (it->auth(config.Passwd)) {
@@ -734,6 +752,7 @@ namespace suil::db {
     {
         cache_handle_t entry{it, -1};
         if (!dctor && (config.KeepAlive != 0)) {
+            mill::Lock lk{cachedMutex};
             entry.alive = mnow() + Ego.config.KeepAlive;
             cache.push_back(entry);
             if (!Ego.cleaning) {
@@ -741,26 +760,30 @@ namespace suil::db {
                 go(cleanup(Ego));
             }
         }
-        else if (it != clients.end()){
-            // caching not supported, delete client
-            it->onClose = nullptr;
-            clients.erase(it);
+        else {
+            mill::Lock lk{clientsMutex};
+            if (it != clients.end()) {
+                // caching not supported, delete client
+                it->onClose = nullptr;
+                clients.erase(it);
+            }
         }
     }
 
     void RedisDb::cleanup(RedisDb& db)
     {
         int64_t expires = db.config.KeepAlive + 300;
+        db.cleaning = true;
+
+        mill::Lock lk{db.cachedMutex};
         if (db.cache.empty()) {
             return;
         }
 
-        db.cleaning = true;
         do {
-            uint8_t status{0};
-            if (db.notify[expires] >> status) {
-                if (status == 1) break;
-            }
+            db.pruneEvt.wait(lk, expires);
+            if (db.aborting)
+                break;
 
             /* was not forced to exit */
             auto it = db.cache.begin();
@@ -771,11 +794,18 @@ namespace suil::db {
             ltrace(&db, "starting prune with %ld connections", db.cache.size());
             while (it != db.cache.end()) {
                 if ((*it).alive <= t) {
-                    if (db.isValid(it->it)) {
-                        it->it->onClose = nullptr;
-                        db.clients.erase(it->it);
-                    }
                     db.cache.erase(it);
+
+                    lk.unlock();
+                    {
+                        mill::Lock cLk{db.clientsMutex};
+                        if (db.isValid(it->it)) {
+                            it->it->onClose = nullptr;
+                            db.clients.erase(it->it);
+                        }
+                    }
+                    lk.lock();
+
                     it = db.cache.begin();
                 } else {
                     /* there is no point in going forward */
@@ -784,7 +814,9 @@ namespace suil::db {
 
                 if ((++pruned % 100) == 0) {
                     /* avoid hogging the CPU */
+                    lk.unlock();
                     yield();
+                    lk.lock();
                 }
             }
             ltrace(&db, "pruned %ld connections", pruned);
@@ -793,7 +825,15 @@ namespace suil::db {
                 /*ensure that this will run after at least 3 second*/
                 expires = std::max((*it).alive - t, (int64_t)3000);
             }
-        } while (!db.cache.empty());
+        } while (!db.cache.empty() and !db.aborting);
+
+        lk.unlock();
+
+        if (db.aborting) {
+            // remove all cached clients
+            mill::Lock cLk{db.clientsMutex};
+            db.clients.clear();
+        }
 
         db.cleaning = false;
     }

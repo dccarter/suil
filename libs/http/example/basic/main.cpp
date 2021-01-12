@@ -4,13 +4,7 @@
 
 #include "suil/http/server/endpoint.hpp"
 #include "suil/http/server/sysattrs.hpp"
-#include "suil/http/server/cors.hpp"
 #include "suil/http/server/admin.hpp"
-#include "suil/http/server/initializer.hpp"
-#include "suil/http/server/jwtauth.hpp"
-#include "suil/http/server/jwtsession.hpp"
-#include "suil/http/server/redismw.hpp"
-#include "suil/http/server/fileserver.hpp"
 
 namespace hs = suil::http::server;
 namespace net  = suil::net;
@@ -26,7 +20,10 @@ int main(int argc, char *argv[])
     };
 
     // Create an http endpoint
-    Server ep("/", opt(serverConfig, std::move(sock)) ,opt(keepAliveTime, 5_min));
+    Server ep("/",
+              opt(serverConfig, std::move(sock)),
+              opt(keepAliveTime, 5_min),
+              opt(numberOfWorkers, 1));
 
     // Add an unsecure route used for login
     Route(ep, "/echo/1")
@@ -58,7 +55,7 @@ int main(int argc, char *argv[])
     .attrs(opt(ReplyType, "text/plain"))
     ([&](suil::String name) {
         // body will be cleared after response
-        return suil::catstr("Hello ", name);
+        return suil::catstr("Hello ", name, " from ", mtid());
     });
 
     return ep.start();

@@ -34,7 +34,7 @@ namespace suil::http::server {
             throw KeyNotFound("Query string does not contain key '", name, "'");
         }
 
-    private:
+    private suil_ut:
         char *_url{nullptr};
         std::vector<char *> _params;
     };
