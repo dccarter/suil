@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     Server ep("/",
               opt(serverConfig, std::move(sock)),
               opt(keepAliveTime, 5_min),
-              opt(numberOfWorkers, 4));
+              opt(numberOfWorkers, 1));
 
     // Add an unsecure route used for login
     Route(ep, "/echo/1")

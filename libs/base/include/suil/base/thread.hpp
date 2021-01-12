@@ -257,6 +257,13 @@ namespace suil {
         void initializeWorkers(Args&&... args)
         {
             static const auto nCores = std::thread::hardware_concurrency();
+            if (_nExecutors == 0) {
+                // default  to number of CPU cores
+                idebug("pool '" PRIs "' - defaulting number of executors to number of CPU cores {%u}",
+                            _PRIs(_name), nCores);
+                _nExecutors = nCores;
+            }
+
             if (_nExecutors > nCores) {
                 // We really should limit our number of threads to number of CPU cores
                 iwarn("pool '" PRIs "' - number of requested threads {%u} exceeds number CPU cores{%u}",

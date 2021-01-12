@@ -23,16 +23,11 @@ namespace suil::http::server {
     class EndpointContext;
 
     template <typename... Mws>
-    class ConnectionWorker : public WorkerThread<net::Socket>, LOGGER(HTTP_SERVER) {
+    class ConnectionWorker : public ThreadExecutor<net::Socket> {
     public:
-        using WorkerThread<net::Socket>::WorkerThread;
-        ConnectionWorker(
-                mill::Event& poolSync,
-                uint32 backoffLow,
-                uint32 backoffHigh,
-                std::shared_ptr<EndpointContext<Mws...>> ctx)
-            : WorkerThread<net::Socket>(poolSync, backoffLow, backoffHigh),
-              ctx{ctx}
+        ConnectionWorker(ThreadPool<net::Socket>& pool, int index, EndpointContext<Mws...>& ctx)
+            : ThreadExecutor<net::Socket>(pool, index),
+              _ctx{ctx}
         {}
 
         void executeWork(Work &work) override
