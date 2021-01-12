@@ -12,7 +12,7 @@
 namespace suil::http {
 
     class HttpParser : protected llhttp_t {
-    protected:
+    protected suil_ut:
         HttpParser(llhttp_type type = HTTP_REQUEST);
         bool feed(const char *data, size_t len);
         virtual void clear(bool intern = false);
@@ -63,6 +63,5 @@ namespace suil::http {
         static int on_header_value_complete(llhttp_t *);
         static int on_message_begin(llhttp_t *);
     };
-
 }
 #endif //SUIL_HTTP_SERVER_PARSER_HPP

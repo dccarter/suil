@@ -87,7 +87,7 @@ namespace suil::net {
         bool isRunning() const { return mRunning; }
         virtual ~ServerSocket() = default;
     protected:
-        bool mRunning{false};
+        std::atomic_bool mRunning{false};
     };
 }
 #endif //SUILNETWORK_SOCKET_HPP

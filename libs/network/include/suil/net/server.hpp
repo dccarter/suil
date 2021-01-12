@@ -15,7 +15,8 @@ namespace suil::net {
     ServerSocket::UPtr createAdaptor(const SocketConfig& config);
     bool adaptorListen(ServerSocket& adaptor, const SocketConfig& config, int backlog);
     String getAddress(const SocketConfig& config);
-    struct BlockingHandler {
+
+    struct CustomSchedulingHandler {
     };
 
     template <typename Handler, class Context = void>
@@ -64,11 +65,11 @@ namespace suil::net {
 
             while (!mExiting) {
                 if (auto sock = Adaptor->accept(mConfig.acceptTimeout)) {
-                    if constexpr (!std::is_base_of_v<BlockingHandler, Handler>) {
+                    if constexpr (!std::is_base_of_v<CustomSchedulingHandler, Handler>) {
                         go(handle(Ego, std::move(sock)));
                     }
                     else {
-                        Handler{}(std::move(sock), mContext);
+                        Handler{}(std::move(sock), *mContext);
                     }
                 }
                 else {
@@ -87,6 +88,10 @@ namespace suil::net {
             mExiting = false;
             idebug("Server exiting {status=%d}", status);
             return status;
+        }
+
+        inline bool isRunning() const {
+            return (Adaptor != nullptr) and Adaptor->isRunning();
         }
 
         virtual void stop()
@@ -111,7 +116,7 @@ namespace suil::net {
         {
             Socket::UPtr tmp = std::move(sock);
             try {
-                Handler()(*tmp, Self.mContext);
+                Handler()(*tmp, *Self.mContext);
                 if (tmp->isOpen()) {
                     // close socket if still open
                     tmp->close();

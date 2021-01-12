@@ -11,8 +11,8 @@ namespace suil::net::smtp {
     constexpr const char *CRLF{"\r\n"};
     constexpr const char *CRLFCRLF{"\r\n\n"};
 
-    void ServerHandler::operator()(Socket& sock, ServerContext::Ptr context) {
-        ServerProtocol proto(sock, std::move(context));
+    void ServerHandler::operator()(Socket& sock, ServerContext& context) {
+        ServerProtocol proto(sock, context);
         try {
             proto.startSession();
         }

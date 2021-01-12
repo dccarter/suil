@@ -14,15 +14,19 @@
 
 namespace suil {
 
+    template <typename Executor>
+    class ThreadPool;
+
+    define_log_tag(THRD_EXECUTOR);
+
     template <typename W>
-    class WorkerThread {
+    class ThreadExecutor : public LOGGER(THRD_EXECUTOR) {
     public:
         using Work = W;
-        using Ptr  = std::unique_ptr<WorkerThread<Work>>;
-        WorkerThread(mill::Event& poolSync, uint32 backoffLow, uint32 backoffHigh)
-            : _poolEvt{poolSync},
-              _backoffLow{backoffLow},
-              _backoffHigh{backoffHigh}
+        using Ptr  = std::unique_ptr<ThreadExecutor<Work>>;
+        ThreadExecutor(ThreadPool<W>& pool, int index)
+            : _pool(pool),
+              _index{index}
         {}
 
         bool queueWork(std::unique_ptr<Work>& work)
@@ -37,11 +41,12 @@ namespace suil {
             {
                 mill::Lock lk{_wqMutex};
                 _workQueue.push_back(std::move(work));
-                // sdebug("%u -> %u/%zu", mtid(), _workInProgress.load(), _workQueue.size());
-                if (++_workInProgress >= _backoffHigh) {
-                    _backoff = _backoffLow != _backoffHigh;
+                _workInProgress++;
+                if (_pool.isBackoffEnabled() and (_workInProgress >= _pool.backoffHigh())) {
+                    _backoff = true;
                 }
             }
+
             _waitingEvt.notify();
             return true;
         }
@@ -53,23 +58,32 @@ namespace suil {
             // run work queue until explicitly stopped
             _stopped = false;
             _th = masync([this] {
-                while (!_stopped) {
-                    std::unique_ptr<Work> work{};
-                    // wait for events and dispatch
-                    {
-                        mill::Lock lk{_wqMutex};
-                        if (_workQueue.empty()) {
-                            // wait until there is an event or the dispatcher is aborted
-                            _waitingEvt.wait(lk);
-                            continue;
-                        }
-                        // sdebug("%u -> %u/%zu", mtid(), _workInProgress.load(), _workQueue.size());
-                        work = std::move(_workQueue.front());
-                        _workQueue.pop_front();
-                    }
-                    go(runWork(Ego, std::move(work)));
-                }
+                idebug("Starting thread pool executor " PRIs "/%d",
+                           _PRIs(_pool.name()), _index);
+                executeLoop();
+                idebug(PRIs "/%d thread pool executor done",
+                                _PRIs(_pool.name()), _index);
             });
+        }
+
+        virtual void executeLoop()
+        {
+
+            while (!_stopped) {
+                std::unique_ptr<Work> work{};
+                // wait for events and dispatch
+                {
+                    mill::Lock lk{_wqMutex};
+                    if (_workQueue.empty()) {
+                        // wait until there is an event or the dispatcher is aborted
+                        _waitingEvt.wait(lk);
+                        continue;
+                    }
+                    work = std::move(_workQueue.front());
+                    _workQueue.pop_front();
+                }
+                go(runWork(Ego, std::move(work)));
+            }
         }
 
         void stop()
@@ -79,61 +93,69 @@ namespace suil {
                 // tell dispatcher to stop if it is working
                 _waitingEvt.notify();
             }
-        }
 
-
-        inline virtual ~WorkerThread() {
-            Ego.stop();
             if (_th.joinable()) {
                 _th.join();
             }
         }
 
+
+        inline virtual ~ThreadExecutor() {
+            Ego.stop();
+        }
+
+        inline int index() const {
+            return _index;
+        }
+
     protected:
         virtual void executeWork(Work& work) = 0;
-
-    private:
-        static coroutine void runWork(WorkerThread& S, std::unique_ptr<Work>&& work)
-        {
-            auto wrk = std::move(work);
-            S.executeWork(*wrk);
-            S._workInProgress--;
-            if (S._backoff and S._workInProgress <= S._backoffLow) {
-                // turn off backoff and notify producer that we are ready for work
-                S._backoff = false;
-                S._poolEvt.notifyOne();
-            }
-        }
 
         std::deque<std::unique_ptr<Work>> _workQueue{};
         mill::Mutex  _wqMutex{};
         mill::Event  _waitingEvt{};
-        mill::Event& _poolEvt;
-        uint32 _backoffLow{0};
-        uint32 _backoffHigh{0};
         std::thread _th;
         std::atomic_bool _stopped{false};
         std::atomic_bool _backoff{false};
         std::atomic_uint32_t _workInProgress{0};
+        ThreadPool<W>& _pool;
+        int _index{0};
+
+    private:
+        void onWorkDone()
+        {
+            _workInProgress--;
+            if (_backoff and (_workInProgress <= _pool.backoffLow())) {
+                // pressure released, notify to pool we are ready for work
+                _pool.notifyExecutorReady(Ego);
+            }
+        }
+
+        static coroutine void runWork(ThreadExecutor& S, std::unique_ptr<Work>&& work)
+        {
+            auto wrk = std::move(work);
+            S.executeWork(*wrk);
+            S.onWorkDone();
+        }
     };
 
     define_log_tag(THRD_POOL);
-    template <typename Worker>
+    template <typename Work>
     class ThreadPool : LOGGER(THRD_POOL) {
     public:
-        using Work = typename Worker::Work;
+        using Executor = ThreadExecutor<Work>;
 
         explicit ThreadPool(String name)
             : _name{std::move(name)}
         {}
 
         ThreadPool(ThreadPool&& o) noexcept
-            : _workers{std::move(o._workers)},
-              _nWorkers{std::exchange(o._nWorkers, 0)},
-              _workBackoffLow{std::exchange(o._workBackoffLow, 0)},
-              _workBackoffHigh{std::exchange(o._workBackoffHigh, 0)},
-              _lastWorkerIndex{std::exchange(o._lastWorkerIndex, 0)},
-              _waitWorker{std::move(o._waitWorker)},
+            : _executors{std::move(o._executors)},
+              _nExecutors{std::exchange(o._nExecutors, 0)},
+              _backoffLow{std::exchange(o._backoffLow, 0)},
+              _backoffHigh{std::exchange(o._backoffHigh, 0)},
+              _nextExecutorIndex{std::exchange(o._nextExecutorIndex, 0)},
+              _backoffEvent{std::move(o._backoffEvent)},
               _sync{std::move(o._sync)},
               _name{std::move(o._name)}
         {}
@@ -144,23 +166,24 @@ namespace suil {
                 return Ego;
             }
 
-            _workers = std::move(o._workers);
-            _nWorkers = std::exchange(o._nWorkers, 0);
-            _workBackoffLow = std::exchange(o._workBackoffLow, 0);
-            _workBackoffHigh = std::exchange(o._workBackoffHigh, 0);
-            _lastWorkerIndex = std::exchange(o._lastWorkerIndex, 0);
-            _waitWorker = std::move(o._waitWorker);
+            _executors = std::move(o._executors);
+            _nExecutors = std::exchange(o._nExecutors, 0);
+            _backoffLow = std::exchange(o._backoffLow, 0);
+            _backoffHigh = std::exchange(o._backoffHigh, 0);
+            _nextExecutorIndex = std::exchange(o._nextExecutorIndex, 0);
+            _backoffEvent = std::move(o._backoffEvent);
             _sync = std::move(o._sync);
             _name = std::move(o._name);
             return Ego;
         }
 
-        template <typename... Args>
+        template <typename Exec, typename... Args>
         void start(Args&&... args)
         {
-            if (_workers.empty()) {
+            if (_executors.empty()) {
+                iinfo("Thread pool " PRIs " starting %u executors", _PRIs(_name), _nExecutors);
                 // thread pool not initialized
-                initializeWorkers(std::forward<Args>(args)...);
+                initializeWorkers<Exec>(std::forward<Args>(args)...);
             }
         }
 
@@ -168,7 +191,6 @@ namespace suil {
         inline void emplace(Args&&... args)
         {
             schedule(std::make_unique<Work>(std::forward<Args>(args)...));
-
         }
 
         void schedule(std::unique_ptr<Work>&& work)
@@ -176,67 +198,96 @@ namespace suil {
             mill::Lock lk{_sync};
             while (true) {
                 // find any worker that is not in backoff state
-                int i = _lastWorkerIndex+1;
-                int end = (_lastWorkerIndex+1)%_workers.size();
+                int i = _nextExecutorIndex;
                 do {
-                    if (i == _workers.size())
+                    if (i == _executors.size())
                         i = 0;
-                    auto& worker = _workers[i];
+                    auto& worker = _executors[i];
                     if (worker->queueWork(work)) {
-                        _lastWorkerIndex = i;
+                        _nextExecutorIndex = (i+1) % _executors.size();
                         return;
                     }
-                } while(++i != end);
+                } while(++i != _nextExecutorIndex);
 
                 // Wait for any worker to be ready to receive work
                 idebug("All workers in backoff state, waiting for a worker to be available");
-                _waitWorker.wait(lk);
+                _backoffEvent.wait(lk);
             }
         }
 
-        inline ThreadPool<Worker>& setNumberOfWorkers(uint16 workers) {
-            _nWorkers = workers;
+        inline ThreadPool<Work>& setNumberOfWorkers(uint16 workers) {
+            _nExecutors = workers;
             return Ego;
         }
 
-        inline ThreadPool<Worker>& setWorkerBackoffWaterMarks(uint32 high, uint32 low) {
-            _workBackoffLow = low;
-            _workBackoffHigh = high;
+        inline ThreadPool<Work>& setWorkerBackoffWaterMarks(uint32 high, uint32 low) {
+            _backoffLow = low;
+            _backoffHigh = high;
             return Ego;
+        }
+
+        inline uint16 backoffLow() const {
+            return _backoffLow;
+        }
+
+        inline uint16 backoffHigh() const {
+            return _backoffHigh;
+        }
+
+        inline const String& name() const {
+            return _name;
+        }
+
+        inline bool isBackoffEnabled() const {
+            return _backoffLow != _backoffHigh;
+        }
+
+        inline void notifyExecutorReady(Executor& w) {
+            if (w.index() >= _executors.size()) {
+                iwarn(PRIs " notifying worker (%d) is not registered in pool",
+                                _PRIs(_name), w.index());
+            }
+            _nextExecutorIndex = w.index();
+            _backoffEvent.notify();
         }
 
     private:
         DISABLE_COPY(ThreadPool);
-        template <typename... Args>
+        template <typename Exec, typename... Args>
         void initializeWorkers(Args&&... args)
         {
             static const auto nCores = std::thread::hardware_concurrency();
-            if (_nWorkers > nCores) {
+            if (_nExecutors > nCores) {
                 // We really should limit our number of threads to number of CPU cores
                 iwarn("pool '" PRIs "' - number of requested threads {%u} exceeds number CPU cores{%u}",
-                      _PRIs(_name), _nWorkers, nCores);
+                      _PRIs(_name), _nExecutors, nCores);
             }
-            _workers.reserve(_nWorkers);
-            for (int i = 0; i < _nWorkers; i++) {
-                _workers.emplace_back(
-                        std::make_unique<Worker>(
-                                _waitWorker,
-                                _workBackoffLow,
-                                _workBackoffHigh,
+            if (_backoffLow > _backoffHigh) {
+                iwarn("pool '" PRIs "' - backoffLow(=%hu) > backoffHigh(=%hu) resetting to 200/256",
+                      _PRIs(_name), _backoffLow, _backoffHigh);
+                setWorkerBackoffWaterMarks(256, 200);
+            }
+
+            _executors.reserve(_nExecutors);
+            for (int i = 0; i < _nExecutors; i++) {
+                _executors.emplace_back(
+                        std::make_unique<Exec>(
+                                Ego, i,
                                 std::forward<Args>(args)...));
-                _workers.back()->init();
-                _workers.back()->run();
+
+                _executors.back()->init();
+                _executors.back()->run();
             }
         }
 
-        std::vector<typename Worker::Ptr> _workers;
-        uint16       _nWorkers{1};
-        uint32       _workBackoffLow{1000};
-        uint32       _workBackoffHigh{1000};
-        uint32       _lastWorkerIndex{0};
-        mill::Event  _waitWorker{};
+        std::vector<typename Executor::Ptr> _executors;
+        uint16       _nExecutors{1};
+        uint32       _backoffLow{1000};
+        uint32       _backoffHigh{1000};
+        uint32       _nextExecutorIndex{0};
+        mill::Event  _backoffEvent{};
         mill::Mutex  _sync{};
-        String      _name{};
+        String       _name{};
     };
 }
 #endif //SUIL_BASE_THREAD_HPP

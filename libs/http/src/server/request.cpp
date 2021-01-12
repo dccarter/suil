@@ -112,13 +112,13 @@ namespace suil::http::server {
 
         Ego._flags.cookiesParsed = 1;
 
-        auto it = Ego._headers.find("Cookie");
-        if (it == Ego._headers.end()) {
+        auto& cookie = Ego.header("Cookie");
+        if (!cookie) {
             // no cookies to parse
             return false;
         }
-        // this will modify the cookie string
-        auto parts = it->second.split(";");
+
+        auto parts = cookie.parts(";");
         for (auto& part: parts) {
             size_t i{0};
             while (i < part.size() and isspace(part[i])) i++;
@@ -129,11 +129,11 @@ namespace suil::http::server {
             auto pos = part.find('=');
             if (pos == String::npos) {
                 // cookie has no value
-                Ego._cookies.emplace(part.substr(i), String{});
+                Ego._cookies.emplace(part.substr(i, pos), String{});
             }
             else {
                 // cookie has value
-                Ego._cookies.emplace(part.substr(i, pos), part.substr(pos+1));
+                Ego._cookies.emplace(part.substr(i, pos-i), part.substr(pos+1));
             }
         }
 
@@ -165,7 +165,7 @@ namespace suil::http::server {
             return parseUrlEncodedForm();
         }
 
-        if (ctype.compare("multipart/form-data", true) == 0) {
+        if (ctype.startsWith("multipart/form-data", true)) {
             itrace("Request::parseForm parsing multipart form");
             auto pos = ctype.find('=');
             if (pos == String::npos) {
@@ -180,7 +180,7 @@ namespace suil::http::server {
         return false;
     }
 
-#define eat_space(p, i) while (isspace((p)[i]) && (p)[i] != '\r') i++
+#define eat_space(p, i) while (((i) < (p).size()) and isspace((p)[(i)]) && ((p)[(i)] != '\r')) i++
 
     static inline bool _get_header(const String& p, int &idx, String& f, String& v) {
         auto tmp = p.substr(idx);
@@ -191,33 +191,34 @@ namespace suil::http::server {
 
         f = tmp.substr(0, pos++);
         eat_space(tmp, pos);
+        idx += pos;
         tmp = tmp.substr(pos);
         pos = 0;
-        while ((tmp[++pos] != '\r') and (pos < tmp.size()));
+        while ((tmp[pos++] != '\r') and (pos < tmp.size()));
 
-        if ((pos < tmp.size()) and (tmp[++pos] == '\n')) {
-            idx = pos;
-            v = tmp.substr(0, pos-2);
+        if ((pos < tmp.size()) and (tmp[pos] == '\n')) {
+            idx += pos;
+            v = tmp.substr(0, pos-1);
             return true;
         }
-        idx = pos;
+        idx += pos;
         return false;
     }
 
-#define goto_chr(p, i, c) ({bool __v = false;                       \
-        while (i < (p).size() && (p)[i] != (c) && (p)[i] != '\r') i++;    \
-        if ((p)[i] == (c)) __v = true; __v; })
+#define goto_chr(p, i, c) ({bool __v = false;                                     \
+        while ((i) < (p).size() && (p)[(i)] != (c) && (p)[(i)] != '\r') (i)++;    \
+        if (((i) < (p).size()) and ((p)[i] == (c))) __v = true; __v; })
 
     static inline bool _get_disposition(String& p, int& idx, String& name, String& filename) {
         int n = 0, f = 0;
-        while (p[idx] != '\0' && p < p.size()) {
+        while ((idx < p.size()) and (p[idx] != '\0')) {
             if (strncasecmp(&p[idx], "name=\"", 6) == 0) {
                 /* eat name=" */
                 idx += 6;
                 auto tmp = p.substr(idx);
                 if (goto_chr(tmp, n, '"')) {
                     name = tmp.substr(0, n);
-                    idx += n;
+                    idx += (n+1);
                 } else {
                     return false;
                 }
@@ -226,9 +227,9 @@ namespace suil::http::server {
                 /* eat filename= */
                 idx += 10;
                 auto tmp = p.substr(idx);
-                if (goto_chr(p, f, '"')) {
+                if (goto_chr(tmp, f, '"')) {
                     filename = tmp.substr(0, f);
-                    idx += n;
+                    idx += (f + 1);
                 } else {
                     return false;
                 }
@@ -238,7 +239,8 @@ namespace suil::http::server {
                 return false;
             }
 
-            if (p[idx] == ';') idx++;
+            if ((idx < p.size()) and (p[idx] == ';'))
+                idx++;
             eat_space(p, idx);
         }
 
@@ -262,7 +264,7 @@ namespace suil::http::server {
 
         int idx{0};
         auto p = String{reinterpret_cast<const char *>(body.data()), body.size(), false};
-        int ds{0};
+        int ds{0}, dsz{0};
         String name;
         String filename;
         String pay;
@@ -303,10 +305,10 @@ namespace suil::http::server {
                         {
                             state = el? state_content : state_end;
                             idx += 2;
-                            if (filename != nullptr) {
+                            if (filename) {
                                 next_state = state_save_file;
                                 cap = true;
-                            } else if (name != nullptr) {
+                            } else if (name) {
                                 next_state = state_save_data;
                                 cap = true;
                             } else if (el) {
@@ -323,10 +325,11 @@ namespace suil::http::server {
 
                 case state_save_file: {
                     itrace("multipart/form-data state_save_file");
-                    UploadedFile f{std::move(filename), Data{pay.data(), pay.size(), false}};
+                    UploadedFile f{std::move(filename),
+                                   Data{&p[ds], size_t(dsz-2), false}};
                     Ego._form.add(std::move(name), std::move(f));
+                    dsz = 0;
                     filename = {};
-                    pay = {};
                     name = {};
                     next_state = state;
                     cap = false;
@@ -336,9 +339,9 @@ namespace suil::http::server {
 
                 case state_save_data: {
                     itrace("multipart/form-data state_save_data");
-                    Ego._form.add(std::move(name), std::move(pay));
+                    Ego._form.add(std::move(name), p.substr(ds, dsz-2));
                     name = {};
-                    pay = {};
+                    dsz  = 0;
                     next_state = state;
                     cap = false;
                     break;
@@ -353,7 +356,7 @@ namespace suil::http::server {
                         dp.compare("Content-Disposition", true) == 0) {
                         idx++;
                         itrace("multipart/form-data content disposition: " PRIs, _PRIs(val));
-                        if (!val.startsWith("form-data", true) != 0) {
+                        if (!val.startsWith("form-data", true)) {
                             /* unsupported disposition */
                             itrace("error: multipart/form-data not content disposition: " PRIs,
                                    _PRIs(val));
@@ -378,7 +381,7 @@ namespace suil::http::server {
                 case state_header: {
                     state = state_header;
                     itrace("multipart/form-data state_header\n" PRIs,
-                           &p[idx], std::min(size_t(100), p.size() - idx));
+                           p.data(), std::min(size_t(100), p.size() - idx));
                     String field, value;
                     if (p[idx] == '\r' && p[++idx] == '\n') {
                         ds = ++idx;
@@ -396,7 +399,7 @@ namespace suil::http::server {
                 case state_data: {
                     state = state_data;
                     itrace("multipart/form-data state_data");
-                    pay = p.substr(ds, idx);
+                    dsz++;
                     idx++;
                     next_state = state_is_boundary;
                     break;
@@ -416,7 +419,7 @@ namespace suil::http::server {
             }
         }
 
-        return false;
+        return state == state_end;
     }
 
 #undef eat_space
@@ -424,7 +427,7 @@ namespace suil::http::server {
 
     bool Request::parseUrlEncodedForm() {
         auto data = Ego.readBody();
-        if (data.empty() > 0) {
+        if (!data.empty()) {
             String tmp{reinterpret_cast<char*>(data.data()), data.size(), false};
             auto parts = tmp.parts("&");
             for(auto& part : parts) {
@@ -568,6 +571,7 @@ namespace suil::http::server {
 
     Data Request::readBody()
     {
+        // TODO
         if (!Ego._flags.hasBody or Ego._flags.bodyError or Ego._flags.offloadError) {
             return Data{};
         }
@@ -586,13 +590,16 @@ namespace suil::http::server {
 
     int Request::onMessageComplete()
     {
-        Ego._flags.hasBody  = Ego.content_length != 0;
+        if (!_flags.hasBody and !_stage.empty()) {
+            _flags.hasBody = 1;
+        }
         return HttpParser::onMessageComplete();
     }
 
     int Request::onHeadersComplete()
     {
-        if (Ego._headers.contains("Content-Length")) {
+        _contentLength = content_length;
+        if (_contentLength > 0) {
             if (Ego.content_length > _config.maxBodyLen) {
                 idebug("Request::processHeaders(%s) request to large: %d",
                        sock().id(), content_length);
@@ -619,3 +626,136 @@ namespace suil::http::server {
         return HPE_OK;
     }
 }
+
+#ifdef SUIL_UNITTEST
+#include "suil/net/tcp.hpp"
+#include <catch2/catch.hpp>
+using suil::http::server::Request;
+suil::net::TcpSock sock{};
+suil::http::server::HttpServerConfig config{};
+
+inline bool feed(Request& req, const suil::String& d, bool clear = false)
+{
+    if (clear) req.clear();
+    return req.feed(d.data(), d.size());
+}
+
+TEST_CASE("Test parsing and process of http request", "[http][http::request]")
+{
+    WHEN("Handling http parser callbacks")
+    {
+        Request req(sock, config);
+        auto status = feed(req, "GET / HTTP/1.1\r\n\r\n");
+        REQUIRE(status);
+        REQUIRE(req._headersComplete == 1);
+        REQUIRE(req._bodyComplete == 1);
+        REQUIRE(req._url == "/");
+        REQUIRE(req._qps._params.empty());
+        REQUIRE(req._flags.bodyOffload == 0);
+        REQUIRE(req._flags.hasBody == 0);
+
+        status = feed(req, "GET /home HTTP/1.1\r\n", true);
+        REQUIRE(status);
+        REQUIRE(req._headersComplete == 0);
+        REQUIRE(req._bodyComplete == 0);
+        REQUIRE(req._url == "/home");
+        REQUIRE(req._qps._params.empty());
+
+        status = feed(req, "GET /home?name=Carter&age=30 HTTP/1.1\r\n", true);
+        REQUIRE(status);
+        REQUIRE(req._headersComplete == 0);
+        REQUIRE(req._bodyComplete == 0);
+        REQUIRE(req._url == "/home");
+        REQUIRE(req._qps._params.size() == 2);
+        REQUIRE(req._qps.get("name") == "Carter");
+        REQUIRE(req._qps.get("age")  == "30");
+
+        status = feed(req, "Content-Length: 11\r\n"
+                              "Connection: close\r\n"
+                              "Foo: bar\r\n\r\n");
+        REQUIRE(status);
+        REQUIRE(req._headersComplete == 1);
+        REQUIRE(req._bodyComplete == 0);
+        REQUIRE(req.getMethod() == suil::http::Method::Get);
+        REQUIRE(req.header("Connection") == "close");
+        REQUIRE(req.header("Foo") == "bar");
+
+        status = feed(req, "Hello World");
+        REQUIRE(status);
+        REQUIRE(req._headersComplete == 1);
+        REQUIRE(req._bodyComplete == 1);
+        REQUIRE(req._flags.hasBody == 1);
+        REQUIRE(req.body() == "Hello World");
+    }
+
+    WHEN("Parsing http request forms")
+    {
+        Request req(sock, config);
+        auto status = feed(req, "POST / HTTP/1.1\r\n"
+                                "Content-Length: 35\r\n"
+                                "Content-Type: application/x-www-form-urlencoded\r\n"
+                                "\r\n"
+                                "name=Carter&age=89&country=Botswana");
+        REQUIRE(status);
+        status = req.parseForm();
+        REQUIRE(status);
+        REQUIRE(req._form.get("name") == "Carter");
+        REQUIRE(req._form.get("age") == "89");
+        REQUIRE(req._form.get("country") == "Botswana");
+        REQUIRE(req._form.uploads().empty());
+
+        status = feed(req, "POST /submit.cgi HTTP/1.1\r\n"
+                           "Host: example.com\r\n"
+                           "User-Agent: curl/7.46.0\r\n"
+                           "Accept: */*\r\n"
+                           "Content-Length: 595\r\n"
+                           "Expect: 100-continue\r\n"
+                           "Content-Type: multipart/form-data; boundary=------------------------d74496d66958873e\r\n\r\b");
+
+        REQUIRE(status);
+        status = feed(req, "--------------------------d74496d66958873e\r\n"
+                           "Content-Disposition: form-data; name=\"person\"\r\n"
+                           "\r\n"
+                           "anonymous\r\n"
+                           "--------------------------d74496d66958873e\r\n"
+                           "Content-Disposition: form-data; name=\"secret\"; filename=\"file.txt\"\r\n"
+                           "Content-Type: text/plain\r\n"
+                           "\r\n"
+                           "contents of the file\r\n"
+                           "--------------------------d74496d66958873e\r\n"
+                           "Content-Disposition: form-data; name=\"source\"\r\n"
+                           "\r\n"
+                           "AlienWorld\r\n"
+                           "--------------------------d74496d66958873e\r\n"
+                           "Content-Disposition: form-data; name=\"coord\"; filename=\"coord.txt\"\r\n"
+                           "Content-Type: text/plain\r\n"
+                           "\r\n"
+                           "40.832090987240534, -74.08417060141278\r\n"
+                           "--------------------------d74496d66958873e--");
+        REQUIRE(status);
+        status = req.parseForm();
+        REQUIRE(status);
+        REQUIRE(req._form.params().size() == 2);
+        REQUIRE(req._form.get("person") == "anonymous");
+        REQUIRE(req._form.uploads().size() == 2);
+        auto& up = req._form.getUpload("secret");
+        REQUIRE(up.name() == "file.txt");
+        suil::String contents{(const char*)up.data().data(), up.data().size(), false};
+        REQUIRE(contents == "contents of the file");
+    }
+
+    WHEN("When parsing HTTP request cookies") {
+        Request req(sock, config);
+        auto status = feed(req, "POST / HTTP/1.1\r\n"
+                                "Content-Type: application/x-www-form-urlencoded\r\n"
+                                "Cookie: cookie1=choco; cookie2=strawberry\r\n"
+                                "\r\n");
+        REQUIRE(status);
+        status = req.parseCookies();
+        REQUIRE(status);
+        REQUIRE(req._cookies.size() == 2);
+        REQUIRE(req.cookie("cookie1") == "choco");
+        REQUIRE(req.cookie("cookie2") == "strawberry");
+    }
+}
+#endif

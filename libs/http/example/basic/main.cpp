@@ -4,13 +4,7 @@
 
 #include "suil/http/server/endpoint.hpp"
 #include "suil/http/server/sysattrs.hpp"
-#include "suil/http/server/cors.hpp"
 #include "suil/http/server/admin.hpp"
-#include "suil/http/server/initializer.hpp"
-#include "suil/http/server/jwtauth.hpp"
-#include "suil/http/server/jwtsession.hpp"
-#include "suil/http/server/redismw.hpp"
-#include "suil/http/server/fileserver.hpp"
 
 namespace hs = suil::http::server;
 namespace net  = suil::net;

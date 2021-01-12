@@ -37,12 +37,17 @@ namespace suil::http::server {
 
         void executeWork(Work &work) override
         {
-            Connection<Mws...> conn{work, ctx->_config, ctx->_router, &ctx->_mws, ctx->_stats};
+            Connection<Mws...> conn{
+                            work,
+                            _ctx.getConfig(),
+                            _ctx.getRouter(),
+                            &_ctx.middlewares(),
+                            _ctx.getStats()};
             conn.start();
         }
 
     private:
-        std::shared_ptr<EndpointContext<Mws...>> ctx;
+        EndpointContext<Mws...>& _ctx;
     };
 
     template <typename ...Mws>
@@ -57,25 +62,58 @@ namespace suil::http::server {
             : _router{std::move(api)},
               _pool{"HttpConnection"}
         {
-            suil::applyConfig(Ego._config, std::forward<Opts>(opts)...);
-            if (Ego._config.keepAliveTime > 0) {
+            suil::applyConfig(_config, std::forward<Opts>(opts)...);
+            if (_config.keepAliveTime > 0) {
                 // change connection timeout match the keep alive time
-                Ego._config.connectionTimeout = Ego._config.keepAliveTime;
+                _config.connectionTimeout = _config.keepAliveTime;
             }
-            Ego._stats = HttpServerStats{};
+            _stats = HttpServerStats{};
             _pool.setNumberOfWorkers(_config.numberOfWorkers)
                  .setWorkerBackoffWaterMarks(
                          _config.threadPoolBackoffHigh,
                          _config.threadPoolBackoffLow);
         }
 
+        inline const HttpServerConfig& getConfig() const {
+            return _config;
+        }
+
+        inline HttpServerConfig& getConfig() {
+            return _config;
+        }
+
+        inline const HttpServerStats& getStats() const {
+            return _stats;
+        }
+
+        inline HttpServerStats& getStats() {
+            return _stats;
+        }
+
+        inline const Router& getRouter() const {
+            return _router;
+        }
+
+        inline Router& getRouter() {
+            return _router;
+        }
+
+        inline const std::tuple<Mws...>& middlewares() const {
+            return _mws;
+        }
+
+        inline std::tuple<Mws...>& middlewares() {
+            return _mws;
+        }
+
+    private:
         HttpServerConfig _config{};
         HttpServerStats  _stats{};
         Router           _router;
         std::tuple<Mws...> _mws{};
-        ThreadPool<ConnectionWorker<Mws...>> _pool;
+        ThreadPool<net::Socket> _pool;
 
-        inline ThreadPool<ConnectionWorker<Mws...>>& getPool() {
+        inline ThreadPool<net::Socket>& getPool() {
             return _pool;
         }
     };
@@ -87,10 +125,10 @@ namespace suil::http::server {
         using Self = Endpoint<Mws...>;
         using Middlewares = std::tuple<Mws...>;
 
-        struct ConnectionHandler : public net::BlockingHandler {
-            void operator()(net::Socket::UPtr&& sock, std::shared_ptr<Context> ctx)
+        struct ConnectionHandler : public net::CustomSchedulingHandler {
+            void operator()(net::Socket::UPtr&& sock, Context& ctx)
             {
-                ctx->getPool().schedule(std::move(sock));
+                ctx.getPool().schedule(std::move(sock));
             }
         };
 
@@ -100,49 +138,55 @@ namespace suil::http::server {
         Endpoint(const String& api, Opts&&... opts)
             : _ctx{new Context(api.dup(), std::forward<Opts>(opts)...)}
         {
-            Ego._backend = std::make_unique<Backend>(
-                                Ego._ctx->_config.serverConfig,
-                                Ego._ctx);
+            _backend = std::make_unique<Backend>(
+                                _ctx->getConfig().serverConfig,
+                                _ctx);
         }
 
         inline int listen() {
-            return Ego.backend().listen();
+            return backend().listen();
         }
 
         int start() {
-            _ctx->getPool().start(_ctx);
-            Ego.router().validate();
-            itrace("starting server....");
-            return Ego.backend().start();
+            if (_backend and backend().isRunning()) {
+                iwarn("Server backend already running, will not be restarted");
+                return EINPROGRESS;
+            }
+            using Executor = ConnectionWorker<Mws...>;
+            _ctx->getPool().template start<Executor>(*_ctx);
+            router().validate();
+            return backend().start();
         }
 
-        inline void stop() {
-            return Ego.backend().stop();
+        void stop() {
+            backend().stop();
+            // stop the thread pool
+            _ctx->getPool().stop();
         }
 
         template <typename... Opts>
         inline void backendConfigure(Opts... opts) {
-            suil::applyConfig(Ego.config().serverConfig, std::forward<Opts>(opts)...);
+            suil::applyConfig(config().serverConfig, std::forward<Opts>(opts)...);
         }
 
         template <typename... Opts>
         inline void configure(Opts... opts) {
-            suil::applyConfig(Ego.config().serverConfig, std::forward<Opts>(opts)...);
+            suil::applyConfig(config().serverConfig, std::forward<Opts>(opts)...);
         }
 
         inline DynamicRule& dynamic(const String& rule) {
-            return Ego.router().createDynamicRule(rule);
+            return router().createDynamicRule(rule);
         }
 
         inline DynamicRule& operator()(const String& rule) {
-            return Ego.dynamic(rule);
+            return dynamic(rule);
         }
 
         template <uint64 Tag>
         typename std::result_of<decltype(&Router::createTaggedRule<Tag>)(Router, const String&)>::type
         route(const String& rule)
         {
-            return Ego.router().template createTaggedRule<Tag>(rule);
+            return router().template createTaggedRule<Tag>(rule);
         }
 
         using MwContext = crow::Context<Mws...>;
@@ -158,40 +202,40 @@ namespace suil::http::server {
         template <typename T>
             requires crow::magic::contains<T, Mws...>::value
         T& middleware() {
-            return crow::get_element_by_type<T, Mws...>(Ego._ctx->_mws);
+            return crow::get_element_by_type<T, Mws...>(_ctx->middlewares());
         }
 
         inline const HttpServerConfig& config() const {
-            return Ego._ctx->_config;
+            return _ctx->getConfig();
         }
 
         inline HttpServerStats& stats() {
-            return Ego._ctx->_stats;
+            return _ctx->getStats();
         }
 
         inline const String& apiBaseRoute() const {
-            return Ego.router().apiBase();
+            return router().apiBase();
         }
 
         inline Router& router() {
-            return Ego._ctx->_router;
+            return _ctx->getRouter();
         }
 
         inline const Router& router() const {
-            return Ego._ctx->_router;
+            return _ctx->getRouter();
         }
 
     private:
         Backend& backend() {
-            if (!Ego._backend) {
+            if (!_backend) {
                 throw UnsupportedOperation("Server backend is null");
             }
 
-            return *Ego._backend;
+            return *_backend;
         }
 
         inline HttpServerConfig& config() {
-            return Ego._ctx->_config;
+            return _ctx->getConfig();
         }
 
         std::shared_ptr<Context> _ctx{nullptr};

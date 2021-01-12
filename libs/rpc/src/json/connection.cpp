@@ -18,16 +18,20 @@ namespace suil::rpc::jrpc {
 
     const RpcServerConfig& Connection::getConfig() const
     {
-        if (context == nullptr) {
+        if (_context == nullptr) {
             static RpcServerConfig defaultConfig;
             return defaultConfig;
         }
-        return context->config();
+        return _context->config();
     }
 
-    void Connection::operator()(net::Socket& sock, Context::Ptr ctx)
+    void Connection::operator()(net::Socket& sock, Context& ctx)
     {
-        Ego.context = std::move(ctx);
+        _context = &ctx;
+        defer({
+            _context = nullptr;
+        });
+
         sock.setBuffering(false);
 
         try {
@@ -100,7 +104,7 @@ namespace suil::rpc::jrpc {
                 resps.push_back(handleExtension(req.method, obj, *req.id));
             }
             else {
-                resps.push_back(handleWithContext(*context, req.method, obj, *req.id));
+                resps.push_back(handleWithContext(*_context, req.method, obj, *req.id));
             }
         }
 

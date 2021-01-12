@@ -17,7 +17,7 @@ namespace suil::rpc::jrpc {
         using LOGGER(JSON_RPC)::log;
         Connection();
 
-        void operator()(net::Socket& sock, std::shared_ptr<Context> ctx);
+        void operator()(net::Socket& sock, Context& ctx);
 
     protected:
         const RpcServerConfig& getConfig() const override;
@@ -30,7 +30,7 @@ namespace suil::rpc::jrpc {
 
     private:
         using ExtensionMethod = std::function<rpc::jrpc::ResultCode(const json::Object&)>;
-        std::shared_ptr<Context> context{nullptr};
+        Context* _context{nullptr};
         UnorderedMap<ExtensionMethod> extensionMethods;
     };
 }

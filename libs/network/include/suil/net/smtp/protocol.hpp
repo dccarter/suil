@@ -63,10 +63,10 @@ namespace suil::net::smtp {
 
     private:
         friend class ServerHandler;
-        ServerProtocol(Socket& sock, std::shared_ptr<ServerContext> context);
+        ServerProtocol(Socket& sock, ServerContext& context);
         void startSession();
         Socket& sock;
-        std::shared_ptr<ServerContext> context{nullptr};
+        ServerContext& context;
         Session session;
     };
 }

@@ -21,9 +21,9 @@ struct DummyWork {
     String message{"Hello World"};
 };
 
-class DummyWorker : public suil::WorkerThread<DummyWork> {
+class DummyWorker : public suil::ThreadExecutor<DummyWork> {
 public:
-    using suil::WorkerThread<DummyWork>::WorkerThread;
+    using suil::ThreadExecutor<DummyWork>::ThreadExecutor;
     void executeWork(Work &work) override {
         strace("work %d waiting %lld", work.index, work.backoff);
         msleep(suil::Deadline{work.backoff});
@@ -40,12 +40,12 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     srand(time(nullptr));
-    suil::ThreadPool<DummyWorker> pool("dummy");
+    suil::ThreadPool<DummyWork> pool("dummy");
     pool.setNumberOfWorkers(24);
     pool.setWorkerBackoffWaterMarks(250, 100);
-    pool.start();
+    pool.template start<DummyWorker>();
     for (int i = 0; i < 1000; i++) {
-        pool.schedule(std::rand()%1500, i);
+        pool.emplace(std::rand()%1500, i);
     }
 
     //
