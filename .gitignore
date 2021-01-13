@@ -70,6 +70,7 @@ dkms.conf
 
 # Build directories
 .build
+build
 .creator
 cmake-build-*
 
