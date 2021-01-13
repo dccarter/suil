@@ -1,0 +1,19 @@
+{
+    "name": "UbuntuDev",
+    "dockerFile": "Dockerfile",
+    "appPort": [8000, 8001, 8002, 8003],
+    "settings": {
+        "workbench.colorTheme": "Atom One Dark",
+        "terminal.integrated.shell.linux": "/bin/zsh"
+    },
+    "extensions": [
+		"ms-vscode.cpptools",
+		"ms-vscode.cmake-tools",
+		"humao.rest-client",
+		"svelte.svelte-vscode",
+		"fivethree.vscode-svelte-snippets",
+		"twxs.cmake",
+		"wesbos.theme-cobalt2",
+		"ms-azuretools.vscode-docker"
+	]
+}
