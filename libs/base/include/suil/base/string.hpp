@@ -540,10 +540,13 @@ namespace suil {
             char  *m_str;
             const char *m_cstr;
         };
+        friend struct CaseInsensitiveHash;
+        template <DataBuf T>
+        friend struct Hasher;
 
         uint32_t m_len{0};
         bool     m_own{false};
-        size_t   m_hash{0};
+        mutable size_t   m_hash{0};
     };
 
     /**
@@ -559,7 +562,7 @@ namespace suil {
     /**
      * suil string (\class String) keyed map case sensitive equality comparer
      */
-    struct CaseSensitive {
+    struct CaseSensitiveCompare {
         inline bool operator()(const String& l, const String& r) const
         {
             return l == r;
@@ -579,7 +582,7 @@ namespace suil {
     /**
      * suil string (\class String) keyed map case in-sensitive equality comparer
      */
-    struct CaseInsensitive {
+    struct CaseInsensitiveCompare {
         inline bool operator()(const String& l, const String& r) const
         {
             if (l.data() != nullptr) {
@@ -590,6 +593,47 @@ namespace suil {
         }
     };
 
+    struct CaseInsensitiveHash {
+        size_t operator()(const String& key) const {
+            constexpr auto init = std::size_t((sizeof(std::size_t) == 8) ? 0xcbf29ce484222325 : 0x811c9dc5);
+            constexpr auto multiplier = std::size_t((sizeof(std::size_t) == 8) ? 0x100000001b3 : 0x1000193);
+            if (key.m_hash != 0) {
+                return key.m_hash;
+            }
+
+            std::size_t hash = init;
+            for (char i : key) {
+                hash ^= ::toupper(i);
+                hash *= multiplier;
+            }
+            key.m_hash = hash;
+            return hash;
+        }
+    };
+
+    template <>
+    struct Hasher<String> {
+        inline size_t operator()(const String& key) const {
+            if (key.m_hash) {
+                return key.m_hash;
+            }
+
+            auto hash = std::hash<strview>{}(strview{key.data(), key.size()});
+            key.m_hash = hash;
+            return hash;
+        }
+    };
+
+    struct CaseSensitive {
+        using comparer_t = CaseSensitiveCompare;
+        using hasher_t   = Hasher<String>;
+    };
+
+    struct CaseInsensitive {
+        using comparer_t = CaseInsensitiveCompare;
+        using hasher_t   = CaseInsensitiveHash;
+    };
+
     /**
      * Definition of an unordered \class String keyed map
      *
@@ -597,7 +641,7 @@ namespace suil {
      * @tparam Cs the equality comparison of the map keys
      */
     template <typename T, typename Cs = CaseSensitive>
-    using UnorderedMap = std::unordered_map<String, T, Hasher<String>, Cs>;
+    using UnorderedMap = std::unordered_map<String, T, typename Cs::hasher_t, typename Cs::comparer_t>;
 
     /**
      * Definition of an ordered \class String keyed map
@@ -606,7 +650,7 @@ namespace suil {
      * @tparam Cs the equality comparison of the map keys
      */
     template <typename T, typename Cs = CaseSensitive>
-    using Map = std::map<String, T, Hasher<String>, Cs>;
+    using Map = std::map<String, T, typename Cs::hasher_t, typename Cs::comparer_t>;
 
     /**
      * @brief Converts a string to a decimal number. Floating point

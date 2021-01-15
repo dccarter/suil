@@ -9,20 +9,29 @@ namespace suil::http::server {
     bool JwtSession::Context::authorize(Jwt jwt)
     {
         assertContext();
+        auto aud = jwt.aud().dup();
         // pass token to JWT authorization middleware
         jwtAuth->authorize(std::move(jwt));
-        // store generated token in database
+
+        // Generate and store refresh token
+        jwt = Jwt{};
+        jwt.aud(std::move(aud));
+        jwt.iat(time(nullptr));
+        if (jwtSession->_refreshTokenExpiry > 0) {
+            jwt.exp(time(nullptr) + jwtSession->_refreshTokenExpiry);
+        }
+        _token = jwt.encode(jwtSession->_refreshTokenKey);
+
         scoped(conn, redisContext->conn(jwtSession->_sessionDb));
-        if (!conn.set(jwtAuth->jwt().aud(), jwtAuth->token())) {
+        if (!conn.set(jwt.aud(), _token)) {
             // saving jwt authentication failed
             jwtAuth->authenticate("Creating session failed");
             return false;
         }
 
-        auto expires = jwtAuth->jwt().exp();
-        if (expires > 0) {
+        if (jwtSession->_refreshTokenExpiry > 0) {
             // when token expires, it should be removed from database
-            conn.expire(jwtAuth->jwt().aud(), expires-time(nullptr));
+            conn.expire(jwt.aud(), jwtSession->_refreshTokenExpiry);
         }
 
         return true;
@@ -36,7 +45,8 @@ namespace suil::http::server {
         for (auto& key : keys) {
             conn.del(key);
         }
-        jwtAuth->logout();
+        _token.clear();
+        jwtAuth->revoke();
     }
 
     bool JwtSession::Context::authorize(db::RedisClient& conn, const String& user)
@@ -47,8 +57,8 @@ namespace suil::http::server {
         }
 
         auto token = conn.get<String>(user);
-        if (!jwtAuth->authorize(token)) {
-            // token has been checked and it's invalid
+        Jwt tok;
+        if (!Jwt::decode(tok, token, jwtSession->_refreshTokenKey)) {
             Ego.revoke(conn, user);
             return false;
         }
@@ -67,7 +77,7 @@ namespace suil::http::server {
 
     void JwtSession::doBefore(Request& req, Response& resp, Context& ctx)
     {
-        if (!ctx.jwtAuth->token().empty()) {
+        if (!ctx.jwtAuth->token().empty() and isSpecialRoute(req.routeId())) {
             // request has authorization token, ensure it is still valid
             scoped(conn, ctx.redisContext->conn(Ego._sessionDb));
             auto res = conn("GET", ctx.jwtAuth->jwt().aud());
@@ -90,8 +100,16 @@ namespace suil::http::server {
         }
     }
 
-    void JwtSession::after(Request& req, Response&, Context& ctx)
+    void JwtSession::after(Request& req, Response& resp, Context& ctx)
     {
+        if (req.routeId() == _revokeTokenRoute) {
+            // force revoke
+            auto& aud = ctx.jwtAuth->jwt().aud();
+            if (aud) {
+                ctx.revoke(aud);
+            }
+        }
+
         // clear the context
         ctx.jwtSession = nullptr;
         ctx.jwtAuth = nullptr;

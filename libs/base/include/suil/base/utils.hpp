@@ -41,6 +41,9 @@
  * access a symbol, \see sym
  */
 #define sym(v) var(v)
+
+#define Sym(v) s::_##v##_t
+
 /**
  * set an option, assign value \param v to variable \param o
  * @param o the variable to assign value to

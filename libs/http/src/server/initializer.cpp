@@ -22,19 +22,10 @@ namespace suil::http::server {
     void Initializer::after(Request& req, Response& resp, Context& ctx)
     {
         if (Ego._blocked) {
-            if (Ego._unblock) {
+            if (ctx._unblock) {
                 Ego._blocked = false;
                 req.enabled(false);
-                Ego._unblock = false;
             }
-        }
-    }
-
-    void Initializer::init(const Request& req, Response& resp)
-    {
-        if (Ego._handler != nullptr) {
-            // invoke initialization handler
-            Ego._unblock = Ego._handler(req, resp);
         }
     }
 }

@@ -2,6 +2,7 @@
 // Created by Mpho Mbotho on 2020-12-18.
 //
 
+#include <suil/http/common.hpp>
 #include "suil/http/server/endpoint.hpp"
 #include "suil/http/server/sysattrs.hpp"
 #include "suil/http/server/cors.hpp"
@@ -14,6 +15,17 @@
 
 namespace hs = suil::http::server;
 namespace net  = suil::net;
+using suil::http::Jwt;
+
+struct User {
+    suil::String passwd{};
+    std::vector<suil::String> roles{};
+};
+
+const suil::UnorderedMap<User> users = {
+        {"admin", {"admin123", {"System-Admin"}}},
+        {"demo", {"example123", {"software"}}}
+};
 
 int main(int argc, char *argv[])
 {
@@ -28,7 +40,7 @@ int main(int argc, char *argv[])
 
     net::ServerConfig sock = {
         .socketConfig = net::TcpSocketConfig{
-            .bindAddr = { .name = "0.0.0.0", .port = 8000 }
+            .bindAddr = { .name = "0.0.0.0", .port = 8100 }
         }
     };
 
@@ -39,10 +51,11 @@ int main(int argc, char *argv[])
     hs::EndpointAdmin::setup(ep);
 
     // Configure hs::Initializer middleware
-    ep.middleware<hs::Initializer>().setup(ep, [](const hs::Request& req, hs::Response& resp) {
-        resp << "Server initialized by: " << req.query().get("admin");
-        return true;
-    });
+    ep.middleware<hs::Initializer>().setup(ep)
+        ([&ep](const hs::Request& req, hs::Response& resp) {
+            resp << "Server initialized by: " << req.query().get("admin");
+            ep.context<hs::Initializer>(req).unblock();
+        });
 
     // Configure hs::JwtAuthorization middleware
     ep.middleware<hs::JwtAuthorization>().setup(opt(key, "dzHzHvr"));
@@ -53,19 +66,41 @@ int main(int argc, char *argv[])
     // attach a file server to the endpoint
     hs::FileServer fileServer(ep);
 
-    struct User {
-        suil::String passwd{};
-        std::vector<suil::String> roles{};
-    };
-    const suil::UnorderedMap<User> users = {
-            {"admin", {"admin123", {"System-Admin"}}},
-            {"demo", {"example123", {"software"}}}
-    };
+    // Configure JWT session
+    auto& session = ep.middleware<hs::JwtSession>();
+    session.setup(opt(refreshTokenKey, "cR4jxGGe8q4mdKN0f1rhkA=="));
+
+    session.
+        refresh(ep, opt(onTokenRefresh, "/refresh"))
+        ([&](const hs::Request& req, hs::Response& resp) {
+            auto& auth = ep.context<hs::JwtAuthorization>(req);
+
+            auto& aud = auth.jwt().aud();
+            auto it = users.find(aud);
+            if (it == users.end()) {
+                // Dead & Gone
+                resp.end(suil::http::Forbidden);
+            }
+            // Just need to create a new token and return it the user
+            auto& [name, user] = *it;
+            Jwt jwt{};
+            jwt.aud(name.peek());
+            jwt.roles(user.roles);
+            auth.authorize(std::move(jwt));
+            resp << R"({"accessToken": ")" << auth.token() << R"("})";
+        });
+
+    session.
+        refresh(ep, opt(onTokenRevoke, "/revoke"))
+        ([]() {
+            // nothing for us to do token will be revoked by middleware
+            return suil::http::NoContent;
+        });
 
     // Add an unsecure route used for login
     Route(ep, "/login")
     ("GET"_method, "OPTIONS"_method)
-    .attrs(opt(ReplyType, "text/plain"))
+    .attrs(opt(ReplyType, "application/json"))
     ([&](const hs::Request& req, hs::Response& res) {
         const auto& user = req.query().get("username");
         const auto& passwd = req.query().get("passwd");
@@ -79,14 +114,16 @@ int main(int argc, char *argv[])
         }
 
         auto& jwtSession = ep.context<hs::JwtSession>(req);
-        if (!jwtSession.authorize(user)) {
-            suil::http::Jwt jwt;
-            jwt.aud(user.peek());
-            jwt.roles(it->second.roles);
-            if (jwtSession.authorize(std::move(jwt))) {
-                // DON'T DO THIS AT HOME
-                res << ep.context<hs::JwtAuthorization>(req).token();
-            }
+        jwtSession.revoke(user);
+        Jwt jwt;
+        jwt.aud(user.peek());
+        jwt.roles(it->second.roles);
+        if (jwtSession.authorize(std::move(jwt))) {
+            res << R"({"accessToken": ")"
+                << ep.context<hs::JwtAuthorization>(req).token()
+                << R"(", "refreshToken": ")"
+                << jwtSession.token()
+                << R"("})";
         }
     });
 
