@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Postfix all debug libraries with -dbg
-set(CMAKE_DEBUG_POSTFIX "-dbg")
+#set(CMAKE_DEBUG_POSTFIX "-dbg")
 
 # Some project options
 option(ENABLE_UNIT_TESTS    "Enable building of unit tests" ON)
