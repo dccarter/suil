@@ -30,22 +30,31 @@ set(SUIL_HTTP_SERVER_SOURCES
         src/llhttp/api.c
         src/llhttp/http.c
         src/llhttp/llhttp.c
-        ${CMAKE_BINARY_DIR}/scc/suil/http/jwt.scc.cpp
-        ${CMAKE_BINARY_DIR}/scc/suil/http/server.scc.cpp
-        ${CMAKE_BINARY_DIR}/scc/suil/http/route.scc.cpp)
+        ${CMAKE_BINARY_DIR}/scc/public/suil/http/jwt.scc.cpp
+        ${CMAKE_BINARY_DIR}/scc/public/suil/http/server.scc.cpp
+        ${CMAKE_BINARY_DIR}/scc/public/suil/http/route.scc.cpp)
 
 add_library(SuilHttpServer STATIC
         ${SUIL_HTTP_SERVER_SOURCES})
 
 target_link_libraries(SuilHttpServer
-        SuilNet SuilDb SuilBase mill ${OPENSSL_LIBRARIES})
+        PUBLIC SuilDb SuilNet)
+
+target_include_directories(SuilHttpServer PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+        $<INSTALL_INTERFACE:include>)
+target_include_directories(SuilHttpServer PRIVATE
+        ${CMAKE_BINARY_DIR}/scc/public)
+
 
 if (ENABLE_UNIT_TESTS)
     include_directories(test)
     include(SuilUnitTest)
     SuilUnitTest(SuilHttpServer-UnitTest
             SOURCES ${SUIL_HTTP_SERVER_SOURCES} test/main.cpp
-            LIBS  SuilDb SuilNet SuilBase mill ssl crypto)
+            LIBS  SuilDb SuilNet)
+    target_include_directories(SuilHttpServer-UnitTest
+            PRIVATE include ${CMAKE_BINARY_DIR}/scc/public)
     add_dependencies(SuilHttpServer-UnitTest SuilHttp-scc)
 
     set_target_properties(SuilHttpServer-UnitTest
