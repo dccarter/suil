@@ -5,7 +5,9 @@ if (ENABLE_EXAMPLES)
         PROPERTIES
             RUNTIME_OUTPUT_NAME net-smtp-ex)
     target_link_libraries(SuilNet-SmtpExample
-            SuilNet SuilBase mill  ${OPENSSL_LIBRARIES})
+            PRIVATE SuilNet)
+    target_include_directories(SuilNet-SmtpExample
+            PRIVATE ${CMAKE_BINARY_DIR}/scc/public)
 
     add_executable(SuilNet-ZmqExample
             example/zmq/main.cpp)
@@ -13,5 +15,7 @@ if (ENABLE_EXAMPLES)
             PROPERTIES
             RUNTIME_OUTPUT_NAME net-zmq-ex)
     target_link_libraries(SuilNet-ZmqExample
-            SuilNet SuilBase mill  ${OPENSSL_LIBRARIES} zmq)
+            PRIVATE SuilNet)
+    target_include_directories(SuilNet-ZmqExample
+            PRIVATE ${CMAKE_BINARY_DIR}/scc/public)
 endif()

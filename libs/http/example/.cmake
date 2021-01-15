@@ -5,7 +5,9 @@ if (ENABLE_EXAMPLES)
             PROPERTIES
             RUNTIME_OUTPUT_NAME http-server-hello)
     target_link_libraries(SuilHttpServer-Hello
-            SuilHttpServer SuilDb SuilNet SuilBase mill  ${OPENSSL_LIBRARIES})
+            PRIVATE SuilHttpServer)
+    target_include_directories(SuilHttpServer-Hello
+            PRIVATE ${CMAKE_BINARY_DIR}/scc/public)
 
     add_executable(SuilHttpServer-Example
             ${CMAKE_CURRENT_SOURCE_DIR}/example/server/main.cpp)
@@ -13,7 +15,9 @@ if (ENABLE_EXAMPLES)
         PROPERTIES
             RUNTIME_OUTPUT_NAME http-server-ex)
     target_link_libraries(SuilHttpServer-Example
-            SuilHttpServer SuilDb SuilNet SuilBase mill  ${OPENSSL_LIBRARIES})
+            SuilHttpServer)
+    target_include_directories(SuilHttpServer-Example
+            PRIVATE ${CMAKE_BINARY_DIR}/scc/public)
 
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/example/server/www/index.html
                    ${CMAKE_CURRENT_BINARY_DIR}/www/index.html @ONLY)
@@ -24,5 +28,7 @@ if (ENABLE_EXAMPLES)
             PROPERTIES
             RUNTIME_OUTPUT_NAME http-client-ex)
     target_link_libraries(SuilHttpClient-Example
-            SuilHttpClient SuilNet SuilBase mill  ${OPENSSL_LIBRARIES})
+            SuilHttpClient)
+    target_include_directories(SuilHttpClient-Example
+            PRIVATE ${CMAKE_BINARY_DIR}/scc/public)
 endif()

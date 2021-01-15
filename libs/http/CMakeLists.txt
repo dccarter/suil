@@ -18,7 +18,7 @@ SuilScc(SuilHttp
         SOURCES  ${SUIL_HTTP_SCC_SOURCES}
         LIB_PATH ${CMAKE_BINARY_DIR}
         DEPENDS  SuilBase-Generator
-        OUTDIR   ${CMAKE_BINARY_DIR}/scc/suil/http)
+        OUTDIR   ${CMAKE_BINARY_DIR}/scc/public/suil/http)
 
 add_dependencies(SuilHttpServer
         SuilHttp-scc)
@@ -31,11 +31,11 @@ set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
 set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
 set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
 set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
-set(NAMESPACE            suil::http::)
+set(NAMESPACE      Suil::)
 
 # Configure '<PROJECT-NAME>Config.cmake.in'
 configure_package_config_file(
-        cmake/Config.cmake.in
+        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
         ${PROJECT_CONFIG}
         INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
 
@@ -53,7 +53,7 @@ install(TARGETS SuilHttpServer SuilHttpClient
 install(DIRECTORY include/suil/http/
         DESTINATION include/suil/http
         FILES_MATCHING PATTERN "*.hpp")
-install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/suil/http/
+install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/public/suil/http/
         DESTINATION include/suil/http
         FILES_MATCHING PATTERN "*.hpp")
 
