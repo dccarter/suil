@@ -3,19 +3,11 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/libs/base/include/**",
-                "${workspaceFolder}/libs/database/include/**",
-                "${workspaceFolder}/libs/http/include/**",
-                "${workspaceFolder}/libs/network/include/**",
+                "${workspaceFolder}/libs/**",
                 "${workspaceFolder}/.build/deps/include/**",
-                "${workspaceFolder}/.build/scc/**",
-                "${workspaceFolder}/libs/base/include"
+                "${workspaceFolder}/.build/scc/**"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/g++-10",
-            "cStandard": "c11",
-            "cppStandard": "c++14",
-            "intelliSenseMode": "clang-x64",
             "configurationProvider": "ms-vscode.cmake-tools"
         }
     ],
