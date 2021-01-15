@@ -11,28 +11,30 @@ namespace suil::http::server {
         memset(&Ego._flags, 0, sizeof(Ego._flags));
     }
 
-    void JwtAuthorization::Context::authorize(Jwt jwt)
+    void JwtAuthorization::Context::authorize(Jwt jwt, JwtUse use)
     {
         Ego._jwt = std::move(jwt);
         Ego._jwt.iat(time(nullptr));
         if (Ego._jwt.exp() == 0) {
-            Ego._jwt.exp(time(nullptr) + jwtAuth->_expiry);
+            auto now = time(nullptr);
+            Ego._jwt.exp(now + jwtAuth->_keyAndTokenExpiry.expiry);
         }
-        Ego._flags.sendTok = 1;
+        Ego.sendTok = std::move(use);
         Ego._flags.encode = 1;
         Ego._flags.requestAuth = 0;
-        Ego._actualToken = Ego._jwt.encode(jwtAuth->_encodeKey);
+        Ego._actualToken = Ego._jwt.encode(jwtAuth->_keyAndTokenExpiry.key);
     }
 
     bool JwtAuthorization::Context::authorize(String token)
     {
         Jwt tok;
-        if (Jwt::decode(tok, token, jwtAuth->_encodeKey)) {
+        if (Jwt::decode(tok, token, jwtAuth->_keyAndTokenExpiry.key)) {
             // token successfully decoded, check if not expired
-            if (tok.exp() > time(nullptr)) {
+            auto now = time(nullptr);
+            auto expiry = jwtAuth->_keyAndTokenExpiry.expiry;
+            if ((expiry <= 0) or ((tok.exp() > now) and ((tok.iat() + expiry) > now))) {
                 // token is valid, authorize request
                 Ego._jwt = std::move(tok);
-                Ego._flags.sendTok = 1;
                 Ego._flags.encode  = 1;
                 Ego._flags.requestAuth = 0;
                 Ego._actualToken = std::move(token);
@@ -45,7 +47,7 @@ namespace suil::http::server {
 
     Status JwtAuthorization::Context::authenticate(Status status, String msg)
     {
-        Ego._flags.sendTok = 0;
+        Ego.sendTok.use = JwtUse::NONE;
         Ego._flags.encode = 0;
         Ego._flags.requestAuth = 1;
         if (msg) {
@@ -55,13 +57,21 @@ namespace suil::http::server {
         return status;
     }
 
-    void JwtAuthorization::Context::logout(String redirect)
+    void JwtAuthorization::Context::revoke(String redirect)
     {
         if (redirect) {
             Ego._redirectUrl = std::move(redirect);
         }
         // do not send token and delete cookie
-        Ego._flags.sendTok = false;
+        Ego.sendTok.use = JwtUse::NONE;
+    }
+
+    bool JwtAuthorization::Context::isJwtExpired(int64 expiry) const
+    {
+        auto now = time(nullptr);
+        return (expiry > 0) and
+               ((_jwt.exp() < now) or
+                ((_jwt.iat() + expiry) < now));
     }
 
     void JwtAuthorization::deleteCookie(Response& resp)
@@ -113,15 +123,16 @@ namespace suil::http::server {
             }
 
             bool isValid{false};
+            auto& keyExpiry = Ego.key(req.routeId());
             try {
-                isValid = Jwt::decode(ctx._jwt, ctx._actualToken, Ego._encodeKey);
+                isValid = Jwt::decode(ctx._jwt, ctx._actualToken, keyExpiry.key);
             }
             catch (...) {
                 // decoding token throws
                 authRequest(resp, "Invalid authorization token");
             }
 
-            if (!isValid or (ctx._jwt.exp() < time(nullptr))) {
+            if (!isValid or (ctx.isJwtExpired(keyExpiry.expiry))) {
                 // token either invalid or has expired
                 authRequest(resp);
             }
@@ -138,21 +149,18 @@ namespace suil::http::server {
     void JwtAuthorization::after(Request&, Response& resp, Context& ctx)
     {
         ctx.jwtAuth = this;
-        if (ctx._flags.sendTok) {
-            // append token to request
-            if (Ego._use.use == JwtUse::HEADER) {
-                // send token in header
-                resp.header(Ego._use.key, suil::catstr("Bearer ", ctx._actualToken));
-            }
-            else {
-                // create cooke for token
-                Cookie ck{Ego._use.key.peek()};
-                ck.domain(Ego._domain.peek());
-                ck.path(Ego._path.peek());
-                ck.value(std::move(ctx._actualToken));
-                ck.expires(time(nullptr));
-                resp.setCookie(std::move(ck));
-            }
+        if (ctx.sendTok.use == JwtUse::HEADER) {
+        // append token to request header
+            resp.header(Ego._use.key, suil::catstr("Bearer ", ctx._actualToken));
+        }
+        else if (ctx.sendTok.use == JwtUse::COOKIE) {
+            // create cooke for token
+            Cookie ck{Ego._use.key.peek()};
+            ck.domain(Ego._domain.peek());
+            ck.path(Ego._path.peek());
+            ck.value(std::move(ctx._actualToken));
+            ck.expires(time(nullptr));
+            resp.setCookie(std::move(ck));
         }
         else if (ctx._redirectUrl) {
             resp.redirect(Status::Found, std::move(ctx._redirectUrl));
@@ -162,9 +170,20 @@ namespace suil::http::server {
             // send authentication request
             resp.header("WWW-Authenticate", Ego._authenticate.peek());
             if (ctx._tokenHdr) {
-                throw HttpError(http::Unauthorized, ctx._tokenHdr);
+                if (resp.isStatus()) {
+                    throw HttpError(resp.isStatus()?http::Unauthorized : resp.status(), ctx._tokenHdr);
+                }
             }
-            throw HttpError(http::Unauthorized);
+            throw HttpError(resp.isStatus()?http::Unauthorized : resp.status());
         }
+    }
+
+    const JwtAuthorization::KeyWithTokenExpiry& JwtAuthorization::key(uint32 route) const
+    {
+        auto it = _routeKeys.find(route);
+        if (it == _routeKeys.end()) {
+            return _keyAndTokenExpiry;
+        }
+        return it->second;
     }
 }

@@ -1,9 +1,14 @@
 {
     "name": "UbuntuDev",
-    "dockerFile": "Dockerfile",
-    "appPort": [8000, 8001, 8002, 8003],
+    "dockerComposeFile": "./docker-compose.yml",
+	"appPort": [8000, 8001, 8002, 8003],
+	"service": "devel",
+	"runArgs": ["--memory=16g"],
+	"shutdownAction": "stopCompose",
+	"workspaceFolder": "/workspace",
     "settings": {
-        "workbench.colorTheme": "Atom One Dark",
+		"workbench.colorTheme": "Atom One Dark",
+		"workbench.iconTheme": "material-icon-theme",
         "terminal.integrated.shell.linux": "/bin/zsh"
     },
     "extensions": [
@@ -14,6 +19,8 @@
 		"fivethree.vscode-svelte-snippets",
 		"twxs.cmake",
 		"wesbos.theme-cobalt2",
-		"ms-azuretools.vscode-docker"
+		"ms-azuretools.vscode-docker",
+		"akamud.vscode-theme-onedark",
+		"pkief.material-icon-theme"
 	]
 }

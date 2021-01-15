@@ -69,7 +69,8 @@ namespace server {
         MOVE_CTOR(Response) noexcept;
         MOVE_ASSIGN(Response) noexcept;
 
-        void end(Status status = http::Ok);
+        void end();
+        void end(Status status);
         void end(Status status, Buffer buffer);
         void end(ProtocolUpgrade upgrade);
 
@@ -188,6 +189,11 @@ namespace server {
         inline bool isStatus(Status status = http::Ok) {
             return Ego._status == status;
         }
+
+        inline Status status() const {
+            return _status;
+        }
+
         void merge(Response&& resp);
         void setContentType(String type);
         void clear();

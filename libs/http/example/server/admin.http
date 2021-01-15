@@ -1,0 +1,34 @@
+###
+# Login/Request tokens
+GET {{baseUrl}}/login?username=admin&passwd=admin123
+
+> {%
+client.test("Request executed successfully", function () {
+    client.assert(response.status === 200, "Admin account should login successfully")
+    client.global.set("refreshToken", response.body.refreshToken)
+    client.global.set("accessToken", response.body.accessToken)
+})
+ %}
+
+###
+# Refresh our token
+GET {{baseUrl}}/refresh
+Authorization: Bearer {{refreshToken}}
+
+> {%
+client.test("Request executed successfully", function () {
+    client.assert(response.status === 200, "Admin should have been issued a new refresh token")
+    client.global.set("accessToken", response.body.accessToken)
+})
+ %}
+
+###
+# Access resource as demo
+PUT {{baseUrl}}/modify/someKey/1029
+Authorization: Bearer {{accessToken}}
+
+###
+# Access resource as demo
+GET {{baseUrl}}/_admin/routes
+Authorization: Bearer {{accessToken}}
+

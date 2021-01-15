@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/libs/**",
+                "${workspaceFolder}/.build/deps/include/**",
+                "${workspaceFolder}/.build/scc/**"
+            ],
+            "defines": [],
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

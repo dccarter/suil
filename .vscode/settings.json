@@ -1,0 +1,10 @@
+{
+    "cmake.configureSettings": {
+        "DEVEL_IDE": "ON"
+    },
+    "cmake.buildDirectory": "${workspaceFolder}/.build",
+    "files.associations": {
+        "*.scc": "cpp"
+    }
+
+}
