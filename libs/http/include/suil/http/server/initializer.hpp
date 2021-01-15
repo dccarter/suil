@@ -18,39 +18,35 @@ namespace suil::http::server {
         using Handler = std::function<bool(const Request&, Response&)>;
 
         struct Context {
+            inline void unblock() {
+                _unblock = true;
+            }
+        private:
+            friend class Initializer;
+            bool     _unblock{false};
         };
 
         void before(Request& req, Response& resp, Context& ctx);
         void after(Request& req,  Response& resp, Context& ctx);
 
         template <typename Ep>
-        void setup(Ep& ep, Handler handler, bool form = true) {
-            if (handler == nullptr) {
-                Ego._blocked = false;
-                return;
-            }
+        DynamicRule& setup(Ep& ep)
+        {
+            auto& route = ep("/app-init");
+            route("POST"_method, "OPTIONS"_method)
+            .attrs(opt(Authorize, false));
 
-            if (Ego._handler == nullptr) {
-                Ego._initRoute =
-                ep("/app-init")
-                ("GET"_method, "POST"_method, "OPTIONS"_method)
-                .attrs(opt(Authorize, Auth{false}), opt(ParseForm, form))
-                ([&](const Request& req, Response& resp) {
-                    init(req, resp);
-                });
+            _initRoute = route.id();
+            _blocked = true;
 
-                Ego._blocked =  true;
-                Ego._handler = handler;
-            }
+            return route;
         }
 
     private:
         void init(const Request& req, Response& resp);
 
-        bool     _blocked{false};
-        bool     _unblock{false};
+        std::atomic_bool     _blocked{false};
         uint32   _initRoute{0};
-        Handler  _handler{nullptr};
     };
 }
 #endif //SUIL_HTTP_SERVER_INITIALIZER_HPP

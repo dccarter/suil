@@ -83,6 +83,11 @@ namespace suil::http::server {
         Ego._completed = true;
     }
 
+    void Response::end()
+    {
+        Ego._completed = true;
+    }
+
     void Response::end(Status status, Buffer buffer)
     {
         if (Ego._body) {
@@ -139,6 +144,8 @@ namespace suil::http::server {
     void Response::clear()
     {
         Ego.clearContent();
+        Ego._status = http::Ok;
+        Ego._upgrade = nullptr;
         Ego._completed = false;
         Ego._cookies.clear();
         Ego._headers.clear();
@@ -153,14 +160,14 @@ namespace suil::http::server {
 
     void Response::merge(Response&& resp)
     {
-        Ego._status = resp._status;
-        Ego._body = std::move(resp._body);
-        Ego._chunks = std::move(resp._chunks);
-        Ego._cookies = std::move(resp._cookies);
-        Ego._chunksSize = resp._chunksSize;
-        for (auto& [k,v] : resp._headers) {
-            Ego._headers.emplace(std::move(k), std::move(v));
-        }
+        Ego._status      = resp._status;
+        Ego._body        = std::move(resp._body);
+        Ego._chunksSize  = resp._chunksSize;
+        Ego._chunks      = std::move(resp._chunks);
+        Ego._cookies.insert(std::make_move_iterator(resp._cookies.begin()),
+                            std::make_move_iterator(resp._cookies.end()));
+        Ego._headers.insert(std::make_move_iterator(resp._headers.begin()),
+                            std::make_move_iterator(resp._headers.end()));
     }
 
 }

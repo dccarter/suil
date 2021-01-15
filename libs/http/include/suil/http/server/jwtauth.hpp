@@ -14,7 +14,7 @@ namespace suil::http::server {
     define_log_tag(JWT_AUTH);
 
     struct JwtUse {
-        typedef enum { HEADER, COOKIE} From;
+        typedef enum { HEADER, COOKIE, NONE} From;
         JwtUse()
             : use(From::HEADER)
         {}
@@ -33,7 +33,7 @@ namespace suil::http::server {
         struct Context {
             Context();
 
-            void authorize(Jwt jwt);
+            void authorize(Jwt jwt, JwtUse use = {JwtUse::NONE, {}});
 
             bool authorize(String token);
 
@@ -43,7 +43,7 @@ namespace suil::http::server {
                 return Ego.authenticate(http::Unauthorized, std::move(msg));
             }
 
-            void logout(String redirect = {});
+            void revoke(String redirect = {});
 
             inline const String& token() const {
                 return Ego._actualToken;
@@ -53,10 +53,13 @@ namespace suil::http::server {
                 return Ego._jwt;
             }
 
+            bool isJwtExpired(int64 expiry) const;
+
         private:
             DISABLE_COPY(Context);
             DISABLE_MOVE(Context);
 
+            JwtUse sendTok{JwtUse::NONE, {}};
             Jwt _jwt{};
             String _actualToken{};
             String _tokenHdr{};
@@ -64,10 +67,9 @@ namespace suil::http::server {
             JwtAuthorization* jwtAuth{nullptr};
             friend struct JwtAuthorization;
             struct {
-                uint8_t sendTok : 1;
                 uint8_t encode : 1;
                 uint8_t requestAuth: 1;
-                uint8_t __u8r5: 5;
+                uint8_t __u8r6: 6;
             } __attribute__((packed)) _flags;
         };
 
@@ -81,8 +83,8 @@ namespace suil::http::server {
             requires iod::is_sio<Opts>::value
         void configure(Opts& opts) {
             /* configure expiry time */
-            Ego._expiry = opts.get(sym(expires), 3600);
-            Ego._encodeKey = std::move(opts.get(sym(key), String{}));
+            Ego._keyAndTokenExpiry.expiry = opts.get(sym(expires), 60);
+            Ego._keyAndTokenExpiry.key = std::move(opts.get(sym(key), String{}));
 
             /* configure authenticate header string */
             Ego._authenticate = std::move(opts.get(sym(realm), String{}));
@@ -103,18 +105,27 @@ namespace suil::http::server {
             configure(options);
         }
 
+        inline void specialize(uint32 routeId, String key, int64 expire) {
+            _routeKeys.emplace(routeId, KeyWithTokenExpiry{std::move(key), expire});
+        }
+
     private:
         DISABLE_COPY(JwtAuthorization);
+        struct KeyWithTokenExpiry {
+            String key;
+            int64 expiry;
+        };
 
+        const KeyWithTokenExpiry& key(uint32 route) const;
         void deleteCookie(Response& resp);
         void authRequest(Response& resp, String msg = {});
 
-        uint64 _expiry{900};
-        String _encodeKey{};
+        KeyWithTokenExpiry _keyAndTokenExpiry{{}, 60};
         String _authenticate{};
         String _domain{};
         String _path{};
         JwtUse _use{};
+        std::unordered_map<uint32, KeyWithTokenExpiry> _routeKeys{};
     };
 }
 #endif //SUIL_HTTP_SERVER_JWTAUTH_HPP

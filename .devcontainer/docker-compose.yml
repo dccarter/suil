@@ -1,0 +1,40 @@
+version: '3.3'
+
+services:
+    devel:
+        build: 
+            context: .
+            dockerfile: ./Dockerfile
+        volumes: 
+            - ..:/workspace:cached
+        networks:
+            - build-net
+        mem_limit: 16g
+        ports:
+            - "8000-8099:8000-8099"
+        command: /bin/sh -c "while sleep 1000; do :; done"
+
+    redis:
+        image: 'redis:alpine'
+        container_name: 'redis-db'
+        restart: always
+        ports:
+            - '63790:6379'
+        networks:
+            - build-net
+
+    postgres:
+        image: 'postgres:12-alpine'
+        container_name: 'postgres-db'
+        ports:
+            - "54320:5432"
+        environment:
+            - POSTGRES_USER=build
+            - POSTGRES_PASSWORD=passwd
+            - POSTGRES_DB=dev
+        networks:
+            - build-net
+
+networks:
+    build-net:
+        driver: bridge
