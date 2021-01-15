@@ -4,12 +4,6 @@ set(SUIL_NETWORK_VERSION "0.1.0" CACHE STRING "The version of suil-network libra
 
 project(SuilNetwork VERSION ${SUIL_NETWORK_VERSION} LANGUAGES C CXX)
 
-find_package(OpenSSL REQUIRED)
-include_directories(include)
-include_directories(${OpenSSL_INCLUDE_DIRS})
-
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/scc)
-
 set(SUIL_NETWORK_SOURCES
         src/chunk.cpp
         src/email.cpp
@@ -34,14 +28,20 @@ set(SUIL_NETWORK_SOURCES
         src/zmq/receiveop.cpp
         src/zmq/socket.cpp
         src/zmq/sendop.cpp
-        ${CMAKE_BINARY_DIR}/scc/suil/net/config.scc.cpp
-        ${CMAKE_BINARY_DIR}/scc/suil/net/symbols.scc.cpp)
+        ${CMAKE_BINARY_DIR}/scc/public/suil/net/config.scc.cpp
+        ${CMAKE_BINARY_DIR}/scc/public/suil/net/symbols.scc.cpp)
 
 add_library(SuilNet STATIC
         ${SUIL_NETWORK_SOURCES})
 
+target_include_directories(SuilNet PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+        $<INSTALL_INTERFACE:include>)
+target_include_directories(SuilNet PRIVATE
+        ${CMAKE_BINARY_DIR}/scc/public)
+
 target_link_libraries(SuilNet
-        SuilBase mill ${OPENSSL_LIBRARIES} zmq)
+        PUBLIC SuilBase Zmq::Zmq)
 
 set(SUIL_NETWORK_SCC_SOURCES
         scc/config.scc
@@ -50,7 +50,7 @@ set(SUIL_NETWORK_SCC_SOURCES
 SuilScc(SuilNet
         SOURCES  ${SUIL_NETWORK_SCC_SOURCES}
         LIB_PATH ${CMAKE_BINARY_DIR}
-        OUTDIR   ${CMAKE_BINARY_DIR}/scc/suil/net)
+        OUTDIR   ${CMAKE_BINARY_DIR}/scc/public/suil/net)
 
 # SuilBase generator needed
 add_dependencies(SuilNet-scc SuilBase-Generator)
@@ -61,11 +61,11 @@ set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
 set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
 set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
 set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
-set(NAMESPACE            suil::net::)
+set(NAMESPACE      Suil::)
 
 # Configure '<PROJECT-NAME>Config.cmake.in'
 configure_package_config_file(
-        cmake/Config.cmake.in
+        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
         ${PROJECT_CONFIG}
         INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
 
@@ -83,7 +83,7 @@ install(TARGETS SuilNet
 install(DIRECTORY include/suil/net/
         DESTINATION include/suil/net
         FILES_MATCHING PATTERN "*.hpp")
-install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/suil/net/
+install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/public/suil/net/
         DESTINATION include/suil/net
         FILES_MATCHING PATTERN "*.hpp")
 
@@ -104,7 +104,10 @@ if (ENABLE_UNIT_TESTS)
     include(SuilUnitTest)
     SuilUnitTest(SuilNet-UnitTest
             SOURCES ${SUIL_NETWORK_SOURCES} test/main.cpp
-            LIBS    SuilBase mill ssl crypto zmq)
+            LIBS    SuilBase Zmq::Zmq)
+    target_include_directories(SuilNet-UnitTest
+            PRIVATE include ${CMAKE_BINARY_DIR}/scc/public)
+
     set_target_properties(SuilNet-UnitTest
             PROPERTIES
             RUNTIME_OUTPUT_NAME net_unittest)
@@ -112,14 +115,3 @@ if (ENABLE_UNIT_TESTS)
 endif()
 
 include(example/.cmake)
-
-if (NOT SUIL_GOD_MODE)
-    set(CPACK_PACKAGE_NAME   ${CMAKE_PROJECT_NAME})
-    set(CPACK_PACKAGE_VENDOR "Suilteam")
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Carter Mbotho")
-    set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}-${OS_VARIANT}-${CMAKE_PROJECT_VERSION})
-    set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
-    set(CPACK_GENERATOR "TGZ")
-
-    include(CPack)
-endif()

@@ -20,7 +20,8 @@ if (ENABLE_EXAMPLES)
             SOURCES generator/example/demo.scc
             DEPENDS SuilBase-Generator
             LIB_PATH ${CMAKE_BINARY_DIR})
-    target_link_libraries(SuilBase-GeneratorExample SuilBase mill)
+    target_link_libraries(SuilBase-GeneratorExample
+            PRIVATE SuilBase mill Threads::Threads)
     set_target_properties(SuilBase-GeneratorExample
             PROPERTIES
             RUNTIME_OUTPUT_NAME base-generator-ex)

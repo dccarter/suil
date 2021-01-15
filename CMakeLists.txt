@@ -10,6 +10,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Postfix all debug libraries with -dbg
+set(CMAKE_DEBUG_POSTFIX "-dbg")
+
 # Some project options
 option(ENABLE_UNIT_TESTS    "Enable building of unit tests" ON)
 option(ENABLE_EXAMPLES      "Enable building examples included in the project" ON)
@@ -38,7 +41,10 @@ set(SUIL_FILE_SERVER_ROUTE 1b7647618ea63937daae8ebb903e9175)
 set(SUIL_GOD_MODE ON)
 
 # Configure path for loading suil cmake scripts
-set(CMAKE_MODULE_PATH /usr/local/share/suil/cmake /usr/share/suil/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake
+        /usr/local/share/suil/cmake
+        /usr/share/suil/cmake)
 
 include(cmake/SuilUtils.cmake)
 include(3rdParty.cmake)
@@ -53,60 +59,34 @@ else()
 endif()
 string(TOUPPER ${CMAKE_BUILD_TYPE} SUIL_BUILD_TYPE)
 
+# Create a version file
 configure_file(
         ${CMAKE_SOURCE_DIR}/cmake/Version.cmake.in
         ${CMAKE_BINARY_DIR}/.generated/suil/version.hpp)
-
-# OpenSSL is required to build suil libraries
-find_package(OpenSSL REQUIRED)
-add_compile_definitions(SSL_SUPPORTED)
-include_directories(${OpenSSL_INCLUDE_DIRS})
-
-# PostgresSQL is also required
-find_package(PostgreSQL ${SUIL_PGSQL_VERSION} REQUIRED)
-include_directories(${PostgreSQL_INCLUDE_DIRS})
-
-# Threads needed
-find_package(Threads REQUIRED)
-
-# ZMQ is also required to build suil
-pkg_check_modules(ZeroMQ QUIET zmq)
-if (NOT ZeroMQ_FOUND)
-    pkg_check_modules(ZeroMQ QUIET libzmq)
-    if (NOT OS_VARIANT STREQUAL "UBUNTU" AND NOT ZeroMQ_FOUND)
-        message(FATAL_ERROR "ZMQ development libraries required")
-    endif()
-endif()
-
-# Check some required functions
-SuilCheckFunctions()
-# Check some required libraries
-SuilCheckLibrary(uuid INCLUDE uuid/uuid.h)
-SuilCheckLibrary(sqlite3 LIBRARY sqlite3 libsqlite3)
-
-# Directory where scc sources are generated
-include_directories(${CMAKE_BINARY_DIR}/scc)
-
-# Directory with config file is generated
 include_directories(${CMAKE_BINARY_DIR}/.generated)
-# add suil base project
-include_directories(libs/base/include)
+
+# Find required libraries
+find_package(OpenSSL REQUIRED)
+find_package(PostgreSQL ${SUIL_PGSQL_VERSION} REQUIRED)
+find_package(Threads REQUIRED)
+find_package(SQLite3 REQUIRED)
+find_package(Uuid REQUIRED)
+find_package(Zmq REQUIRED)
+find_package(LuaS REQUIRED)
+find_package(Dl REQUIRED)
+
+# Grab libmill
+include(FetchContent)
+FetchContent_Declare(
+        libmill
+        GIT_REPOSITORY https://gitlab.com/sw-devel/thirdparty/libmill.git)
+FetchContent_Populate(libmill)
+add_subdirectory(${libmill_SOURCE_DIR} ${libmill_BINARY_DIR})
+
 add_subdirectory(libs/base)
-
-# add suil network project
-include_directories(libs/network/include)
 add_subdirectory(libs/network)
-
-# add suil network project
-include_directories(libs/database/include)
 add_subdirectory(libs/database)
-
-# add suil rpc project
-include_directories(libs/rpc/include)
 add_subdirectory(libs/rpc)
-
-# add suil rpc project
-include_directories(libs/http/include)
 add_subdirectory(libs/http)
 
 set(CPACK_PACKAGE_NAME   ${CMAKE_PROJECT_NAME})

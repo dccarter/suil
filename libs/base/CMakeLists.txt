@@ -38,9 +38,12 @@ set(SUIL_BASE_SOURCES
 # Base library
 add_library(SuilBase STATIC
         ${SUIL_BASE_SOURCES})
+target_include_directories(SuilBase PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+        $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(SuilBase
-        ${OPENSSL_LIBRARIES} uuid lua dl)
+        PUBLIC mill OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid LuaS::Lua Dl::Dl)
 
 include(CMakePackageConfigHelpers)
 
@@ -48,11 +51,11 @@ set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
 set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
 set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
 set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
-set(NAMESPACE            suil::base::)
+set(NAMESPACE      Suil::)
 
 # Configure '<PROJECT-NAME>Config.cmake.in'
 configure_package_config_file(
-        cmake/Config.cmake.in
+        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
         ${PROJECT_CONFIG}
         INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
 
@@ -92,7 +95,9 @@ if (ENABLE_UNIT_TESTS)
     include(SuilUnitTest)
     SuilUnitTest(SuilBase-UnitTest
             SOURCES ${SUIL_BASE_SOURCES} test/main.cpp
-            LIBS mill ${OPENSSL_LIBRARIES} uuid lua dl)
+            LIBS mill OpenSSL::SSL OpenSSL::Crypto LuaS::Lua Uuid::Uuid Dl::Dl)
+    target_include_directories(SuilBase-UnitTest
+            PRIVATE include)
     set_target_properties(SuilBase-UnitTest
         PROPERTIES
             RUNTIME_OUTPUT_NAME base_unittest)

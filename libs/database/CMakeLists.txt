@@ -7,14 +7,20 @@ project(SuilDb VERSION ${SUIL_DB_VERSION} LANGUAGES C CXX)
 set(SUIL_DATABASE_SOURCES
         src/pgsql.cpp
         src/redis.cpp
-        ${CMAKE_BINARY_DIR}/scc/suil/db/config.scc.cpp
-        ${CMAKE_BINARY_DIR}/scc/suil/db/symbols.scc.cpp)
+        ${CMAKE_BINARY_DIR}/scc/public/suil/db/config.scc.cpp
+        ${CMAKE_BINARY_DIR}/scc/public/suil/db/symbols.scc.cpp)
 
 add_library(SuilDb STATIC
         ${SUIL_DATABASE_SOURCES})
 
 target_link_libraries(SuilDb
-    SuilNet SuilBase mill ${OPENSSL_LIBRARIES} pq)
+    PUBLIC SuilNet PostgreSQL::PostgreSQL)
+
+target_include_directories(SuilDb PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+        $<INSTALL_INTERFACE:include>)
+target_include_directories(SuilDb PRIVATE
+        ${CMAKE_BINARY_DIR}/scc/public)
 
 # Transpile scc sources used by database code
 set(SUIL_DATABASE_SCC_SOURCES
@@ -24,7 +30,7 @@ set(SUIL_DATABASE_SCC_SOURCES
 SuilScc(SuilDb
         SOURCES  ${SUIL_DATABASE_SCC_SOURCES}
         LIB_PATH ${CMAKE_BINARY_DIR}
-        OUTDIR   ${CMAKE_BINARY_DIR}/scc/suil/db)
+        OUTDIR   ${CMAKE_BINARY_DIR}/scc/public/suil/db)
 # SuilBase generator needed
 add_dependencies(SuilDb-scc SuilBase-Generator)
 
@@ -34,11 +40,11 @@ set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
 set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
 set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
 set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
-set(NAMESPACE            suil::db::)
+set(NAMESPACE      Suil::)
 
 # Configure '<PROJECT-NAME>Config.cmake.in'
 configure_package_config_file(
-        cmake/Config.cmake.in
+        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
         ${PROJECT_CONFIG}
         INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
 
@@ -56,7 +62,7 @@ install(TARGETS SuilDb
 install(DIRECTORY include/suil/db/
         DESTINATION include/suil/db
         FILES_MATCHING PATTERN "*.hpp")
-install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/suil/db/
+install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/public/suil/db/
         DESTINATION include/suil/db
         FILES_MATCHING PATTERN "*.hpp")
 
@@ -71,5 +77,19 @@ install(FILES ${PROJECT_CONFIG} ${VERSION_CONFIG}
 install(EXPORT      ${TARGETS_EXPORT_NAME}
         NAMESPACE   ${NAMESPACE}
         DESTINATION lib/cmake/${PROJECT_NAME})
+
+if (ENABLE_UNIT_TESTS)
+    include_directories(test)
+    include(SuilUnitTest)
+    SuilUnitTest(SuilDb-UnitTest
+            SOURCES ${SUIL_DATABASE_SOURCES} test/main.cpp
+            LIBS    SuilNet PostgreSQL::PostgreSQL)
+    target_include_directories(SuilDb-UnitTest
+            PRIVATE include ${CMAKE_BINARY_DIR}/scc/public)
+    set_target_properties(SuilDb-UnitTest
+            PROPERTIES
+            RUNTIME_OUTPUT_NAME db_unittest)
+    add_dependencies(SuilDb-UnitTest SuilDb-scc)
+endif()
 
 include(examples/.cmake)

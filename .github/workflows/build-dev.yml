@@ -25,9 +25,9 @@ jobs:
         shell: bash
         run: |
           cd ${{runner.workspace}}/build
-          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_INSTALL_PREFIX=`pwd`/artifacts
 
-      # Build project
+      # Build project dependencies
       - name: Build Dependecies
         shell: bash
         run: |
@@ -39,11 +39,22 @@ jobs:
         shell: bash
         run: |
           cd ${{runner.workspace}}/build
-          make -j4
+          make -j4 install
+
+      - name: UnitTests
+        shell: bash
+        run: |
+          cd ${{runner.workspace}}/build
+          ./libs/base/base_unittest -r junit -o base_unittest.xml
+          ./libs/network/net_unittest -r junit -o net_unittest.xml
+          ./libs/database/db_unittest -r junit -o db_unittest.xml
+          ./libs/rpc/rpc_unittest -r junit -o rpc_unittest.xml
+          ./libs/http/httpserver_unittest -r junit -o httpserver_unittest.xml
+          ./libs/http/httpclient_unittest -r junit -o httpclient_unittest.xml
 
       - name: Cached Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: unit-test-binaries
-          path: ${{runner.workspace}}/build/**/*_unittest
+          name: unit-test-results
+          path: ${{runner.workspace}}/build/*.xml
           retention-days: 1
