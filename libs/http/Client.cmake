@@ -18,29 +18,33 @@ set(SUIL_HTTP_CLIENT_SOURCES
         ${CMAKE_BINARY_DIR}/scc/public/suil/http/jwt.scc.cpp
         ${CMAKE_BINARY_DIR}/scc/public/suil/http/route.scc.cpp)
 
-add_library(SuilHttpClient STATIC
+add_library(HttpClient STATIC
         ${SUIL_HTTP_CLIENT_SOURCES})
+add_library(Suil::HttpClient ALIAS HttpClient)
+set_target_properties(HttpClient
+    PROPERTIES
+        OUTPUT_NAME SuilHttpClient)
 
-target_link_libraries(SuilHttpClient
-        PUBLIC SuilNet)
+target_link_libraries(HttpClient
+        PUBLIC Suil::Net)
 
-target_include_directories(SuilHttpClient PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+target_include_directories(HttpClient PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
-target_include_directories(SuilHttpClient PRIVATE
+target_include_directories(HttpClient PRIVATE
         ${CMAKE_BINARY_DIR}/scc/public)
 
 if (ENABLE_UNIT_TESTS)
     include_directories(test)
     include(SuilUnitTest)
-    SuilUnitTest(SuilHttpClient-UnitTest
+    SuilUnitTest(HttpClient-UnitTest
             SOURCES ${SUIL_HTTP_CLIENT_SOURCES} test/main.cpp
-            LIBS  SuilNet)
-    target_include_directories(SuilHttpClient-UnitTest
+            LIBS  Suil::Net)
+    target_include_directories(HttpClient-UnitTest
             PRIVATE include ${CMAKE_BINARY_DIR}/scc/public)
-    add_dependencies(SuilHttpClient-UnitTest SuilHttp-scc)
+    add_dependencies(HttpClient-UnitTest Http-scc)
 
-    set_target_properties(SuilHttpClient-UnitTest
+    set_target_properties(HttpClient-UnitTest
             PROPERTIES
             RUNTIME_OUTPUT_NAME httpclient_unittest)
 endif()
