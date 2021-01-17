@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
 set(SUIL_VERSION 0.1.0 CACHE STRING "The god version of suil projects")
-project(suil
+project(Suil
         VERSION ${SUIL_VERSION}
         DESCRIPTION "This is the to level project to help with development of suil projects"
         LANGUAGES C CXX)
@@ -35,23 +35,25 @@ set(SUIL_COPYRIGHT     "Copyright (C) 2020, 2017-2020 Suilteam")
 # VERY_SAFE does not share buffer, e.g method String::peek() will return a copy of the buffer
 set(SUIL_BUILD_TYPE_MODE    LAZY CACHE STRING "Switch between string implementations (Default LAZY)")
 
+# This is the route used to configure an HTTP file server on an HTTP endpoint
 set(SUIL_FILE_SERVER_ROUTE 1b7647618ea63937daae8ebb903e9175)
 
-# Tell libraries that they are supervised by god
-set(SUIL_GOD_MODE ON)
 
 # Configure path for loading suil cmake scripts
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+set(CMAKE_MODULE_PATH
+        ${CMAKE_MODULE_PATH}
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake
         /usr/local/share/suil/cmake
         /usr/share/suil/cmake)
 
 include(cmake/SuilUtils.cmake)
-include(3rdParty.cmake)
 include(SuilScc)
+include(SuilGetOsVariant)
+
+# ThirdParty dependencies
+include(3rdParty.cmake)
 
 # Get OS variant
-include(SuilGetOsVariant)
 if (OS_VARIANT)
     string(TOUPPER ${OS_VARIANT} OS_VARIANT)
 else()
@@ -64,6 +66,15 @@ configure_file(
         ${CMAKE_SOURCE_DIR}/cmake/Version.cmake.in
         ${CMAKE_BINARY_DIR}/.generated/suil/version.hpp)
 include_directories(${CMAKE_BINARY_DIR}/.generated)
+
+# Install generated version file
+install(FILES ${CMAKE_BINARY_DIR}/.generated/suil/version.hpp
+        DESTINATION include/suil/)
+
+# Install CMake files
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/cmake/
+        DESTINATION lib/cmake
+        FILES_MATCHING PATTERN "*.cmake")
 
 # Find required libraries
 find_package(OpenSSL REQUIRED)
@@ -83,11 +94,42 @@ FetchContent_Declare(
 FetchContent_Populate(libmill)
 add_subdirectory(${libmill_SOURCE_DIR} ${libmill_BINARY_DIR})
 
+set(NAMESPACE      Suil::)
+set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
+
 add_subdirectory(libs/base)
 add_subdirectory(libs/network)
 add_subdirectory(libs/database)
 add_subdirectory(libs/rpc)
 add_subdirectory(libs/http)
+
+include(CMakePackageConfigHelpers)
+
+set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
+set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
+set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
+
+# Configure '<PROJECT-NAME>Config.cmake.in'
+configure_package_config_file(
+        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
+        ${PROJECT_CONFIG}
+        INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
+
+# Configure '<PROJECT-NAME>ConfigVersion.cmake'
+write_basic_package_version_file(
+        "${VERSION_CONFIG}" COMPATIBILITY SameMajorVersion)
+
+# Install config
+#   * <prefix>/lib/cmake/SuilNetConfig.cmake
+#   * <prefix>/lib/cmake/SuilNetConfigVersion.cmake
+install(FILES ${PROJECT_CONFIG} ${VERSION_CONFIG}
+        DESTINATION lib/cmake/${PROJECT_NAME})
+
+# Install cmake targets
+#   * <prefix>/lib/cmake/SuilNetTargets.cmake
+install(EXPORT      ${TARGETS_EXPORT_NAME}
+        NAMESPACE   ${NAMESPACE}
+        DESTINATION lib/cmake/${PROJECT_NAME})
 
 set(CPACK_PACKAGE_NAME   ${CMAKE_PROJECT_NAME})
 set(CPACK_PACKAGE_VENDOR "Suilteam")

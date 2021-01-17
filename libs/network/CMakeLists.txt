@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 # The version of the library, configurable from command line
 set(SUIL_NETWORK_VERSION "0.1.0" CACHE STRING "The version of suil-network library")
 
-project(SuilNetwork VERSION ${SUIL_NETWORK_VERSION} LANGUAGES C CXX)
+project(Net VERSION ${SUIL_NETWORK_VERSION} LANGUAGES C CXX)
 
 set(SUIL_NETWORK_SOURCES
         src/chunk.cpp
@@ -31,50 +31,36 @@ set(SUIL_NETWORK_SOURCES
         ${CMAKE_BINARY_DIR}/scc/public/suil/net/config.scc.cpp
         ${CMAKE_BINARY_DIR}/scc/public/suil/net/symbols.scc.cpp)
 
-add_library(SuilNet STATIC
+add_library(Net STATIC
         ${SUIL_NETWORK_SOURCES})
+add_library(Suil::Net ALIAS Net)
+set_target_properties(Net
+    PROPERTIES
+        OUTPUT_NAME SuilNet)
 
-target_include_directories(SuilNet PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+target_include_directories(Net PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
-target_include_directories(SuilNet PRIVATE
+target_include_directories(Net PRIVATE
         ${CMAKE_BINARY_DIR}/scc/public)
 
-target_link_libraries(SuilNet
-        PUBLIC SuilBase Zmq::Zmq)
+target_link_libraries(Net
+        PUBLIC Suil::Base Zmq::Zmq)
 
 set(SUIL_NETWORK_SCC_SOURCES
         scc/config.scc
         scc/symbols.scc)
 
-SuilScc(SuilNet
+SuilScc(Net
         SOURCES  ${SUIL_NETWORK_SCC_SOURCES}
         LIB_PATH ${CMAKE_BINARY_DIR}
         OUTDIR   ${CMAKE_BINARY_DIR}/scc/public/suil/net)
 
-# SuilBase generator needed
-add_dependencies(SuilNet-scc SuilBase-Generator)
-
-include(CMakePackageConfigHelpers)
-
-set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
-set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
-set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
-set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
-set(NAMESPACE      Suil::)
-
-# Configure '<PROJECT-NAME>Config.cmake.in'
-configure_package_config_file(
-        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
-        ${PROJECT_CONFIG}
-        INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
-
-# Configure '<PROJECT-NAME>ConfigVersion.cmake'
-write_basic_package_version_file(
-        "${VERSION_CONFIG}" COMPATIBILITY SameMajorVersion)
+# Base generator needed
+add_dependencies(Net-scc Base-Generator)
 
 # Install base library
-install(TARGETS SuilNet
+install(TARGETS Net
         EXPORT  ${TARGETS_EXPORT_NAME}
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
@@ -87,31 +73,19 @@ install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/public/suil/net/
         DESTINATION include/suil/net
         FILES_MATCHING PATTERN "*.hpp")
 
-# Install config
-#   * <prefix>/lib/cmake/SuilNetConfig.cmake
-#   * <prefix>/lib/cmake/SuilNetConfigVersion.cmake
-install(FILES ${PROJECT_CONFIG} ${VERSION_CONFIG}
-        DESTINATION lib/cmake/${PROJECT_NAME})
-
-# Install cmake targets
-#   * <prefix>/lib/cmake/SuilNetTargets.cmake
-install(EXPORT      ${TARGETS_EXPORT_NAME}
-        NAMESPACE   ${NAMESPACE}
-        DESTINATION lib/cmake/${PROJECT_NAME})
-
 if (ENABLE_UNIT_TESTS)
     include_directories(test)
     include(SuilUnitTest)
-    SuilUnitTest(SuilNet-UnitTest
+    SuilUnitTest(Net-UnitTest
             SOURCES ${SUIL_NETWORK_SOURCES} test/main.cpp
-            LIBS    SuilBase Zmq::Zmq)
-    target_include_directories(SuilNet-UnitTest
+            LIBS    Suil::Base Zmq::Zmq)
+    target_include_directories(Net-UnitTest
             PRIVATE include ${CMAKE_BINARY_DIR}/scc/public)
 
-    set_target_properties(SuilNet-UnitTest
+    set_target_properties(Net-UnitTest
             PROPERTIES
             RUNTIME_OUTPUT_NAME net_unittest)
-    add_dependencies(SuilNet-UnitTest SuilNet-scc)
+    add_dependencies(Net-UnitTest Net-scc)
 endif()
 
 include(example/.cmake)
