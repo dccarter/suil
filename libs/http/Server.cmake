@@ -34,30 +34,34 @@ set(SUIL_HTTP_SERVER_SOURCES
         ${CMAKE_BINARY_DIR}/scc/public/suil/http/server.scc.cpp
         ${CMAKE_BINARY_DIR}/scc/public/suil/http/route.scc.cpp)
 
-add_library(SuilHttpServer STATIC
+add_library(HttpServer STATIC
         ${SUIL_HTTP_SERVER_SOURCES})
+add_library(Suil::HttpServer ALIAS HttpServer)
+set_target_properties(HttpServer
+    PROPERTIES
+        OUTPUT_NAME SuilHttpServer)
 
-target_link_libraries(SuilHttpServer
-        PUBLIC SuilDb SuilNet)
+target_link_libraries(HttpServer
+        PUBLIC Suil::Db Suil::Net)
 
-target_include_directories(SuilHttpServer PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+target_include_directories(HttpServer PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
-target_include_directories(SuilHttpServer PRIVATE
+target_include_directories(HttpServer PRIVATE
         ${CMAKE_BINARY_DIR}/scc/public)
 
 
 if (ENABLE_UNIT_TESTS)
     include_directories(test)
     include(SuilUnitTest)
-    SuilUnitTest(SuilHttpServer-UnitTest
+    SuilUnitTest(HttpServer-UnitTest
             SOURCES ${SUIL_HTTP_SERVER_SOURCES} test/main.cpp
-            LIBS  SuilDb SuilNet)
-    target_include_directories(SuilHttpServer-UnitTest
+            LIBS  Suil::Db Suil::Net)
+    target_include_directories(HttpServer-UnitTest
             PRIVATE include ${CMAKE_BINARY_DIR}/scc/public)
-    add_dependencies(SuilHttpServer-UnitTest SuilHttp-scc)
+    add_dependencies(HttpServer-UnitTest Http-scc)
 
-    set_target_properties(SuilHttpServer-UnitTest
+    set_target_properties(HttpServer-UnitTest
             PROPERTIES
             RUNTIME_OUTPUT_NAME httpserver_unittest)
 endif()

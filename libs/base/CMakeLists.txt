@@ -36,35 +36,22 @@ set(SUIL_BASE_SOURCES
         src/wire.cpp)
 
 # Base library
-add_library(SuilBase STATIC
+add_library(Base STATIC
         ${SUIL_BASE_SOURCES})
-target_include_directories(SuilBase PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
+add_library(Suil::Base ALIAS Base)
+set_target_properties(Base
+    PROPERTIES
+        OUTPUT_NAME SuilBase)
+
+target_include_directories(Base PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(SuilBase
-        PUBLIC mill OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid LuaS::Lua Dl::Dl)
-
-include(CMakePackageConfigHelpers)
-
-set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
-set(VERSION_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake)
-set(PROJECT_CONFIG ${GENERATED_DIR}/${PROJECT_NAME}Config.cmake)
-set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
-set(NAMESPACE      Suil::)
-
-# Configure '<PROJECT-NAME>Config.cmake.in'
-configure_package_config_file(
-        ${CMAKE_SOURCE_DIR}/cmake/Config.cmake.in
-        ${PROJECT_CONFIG}
-        INSTALL_DESTINATION lib/cmake/${PROJECT_NAME})
-
-# Configure '<PROJECT-NAME>ConfigVersion.cmake'
-write_basic_package_version_file(
-        "${VERSION_CONFIG}" COMPATIBILITY SameMajorVersion)
+target_link_libraries(Base
+        PUBLIC Libmill::Libmill OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid LuaS::Lua Dl::Dl)
 
 # Install base library
-install(TARGETS SuilBase
+install(TARGETS Base
         EXPORT  ${TARGETS_EXPORT_NAME}
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
@@ -74,31 +61,18 @@ install(DIRECTORY include/suil/base/
         DESTINATION include/suil/base
         FILES_MATCHING PATTERN "*.hpp")
 
-# Install config
-#   * <prefix>/lib/cmake/SuilBaseConfig.cmake
-#   * <prefix>/lib/cmake/SuilBaseConfigVersion.cmake
-install(FILES ${PROJECT_CONFIG} ${VERSION_CONFIG}
-        DESTINATION lib/cmake/${PROJECT_NAME})
-
-# Install cmake targets
-#   * <prefix>/lib/cmake/SuilBaseTargets.cmake
-install(EXPORT      ${TARGETS_EXPORT_NAME}
-        NAMESPACE   ${NAMESPACE}
-        DESTINATION lib/cmake/${PROJECT_NAME})
-
-
 include(generator/.cmake)
 include(examples/.cmake)
 
 if (ENABLE_UNIT_TESTS)
     include_directories(test)
     include(SuilUnitTest)
-    SuilUnitTest(SuilBase-UnitTest
+    SuilUnitTest(Base-UnitTest
             SOURCES ${SUIL_BASE_SOURCES} test/main.cpp
-            LIBS mill OpenSSL::SSL OpenSSL::Crypto LuaS::Lua Uuid::Uuid Dl::Dl)
-    target_include_directories(SuilBase-UnitTest
+            LIBS Libmill::Libmill OpenSSL::SSL OpenSSL::Crypto LuaS::Lua Uuid::Uuid Dl::Dl)
+    target_include_directories(Base-UnitTest
             PRIVATE include)
-    set_target_properties(SuilBase-UnitTest
+    set_target_properties(Base-UnitTest
         PROPERTIES
             RUNTIME_OUTPUT_NAME base_unittest)
 endif()

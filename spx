@@ -1,0 +1,35 @@
+#!/usr/local/bin/lush
+
+local p = import("sys/argparse") {
+    name = "spx",
+    description = [[SPX as simple lush script that pulls a project template from a git repo and strips
+    all git related metadata]]
+}
+
+p:flag("-q", "suppress output from commands being run to give the juice", false)
+p:argument("repo", "The git repo with the project template to pull")
+ :args(1)
+p:argument("name", "The name of the directory to download the template to")
+ :args(1)
+
+local opts = p:parse()
+if pathExists(opts.name) then
+    print("Target directory '"..opts.name.."' already exists, overwrite? [y/N]")
+    local yn = io.read("*l"):upper();
+    if yn == "" or yn == "N" or yn == "NO" then
+        print("Delete directory or try again with a different project name");
+        return 0
+    end
+    print("We moved your existing directory to './_"..opts.name.."', if you don't care about it, delete it yourself")
+    _mv(opts.name, "_"..opts.name)
+end
+
+local msg, ok = _git("clone", opts.repo, opts.name)
+if not ok then
+    print(msg)
+    Lush:exit(-1);
+end
+_rm(opts.name.."/.git", "-rf")
+_rm(opts.name.."/.gitattributes", "-rf")
+print("Project '"..opts.name.."' created from template '"..opts.repo.."'")
+print("!!!Happy suil coding!!!")
