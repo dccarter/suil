@@ -20,13 +20,15 @@ if (ENABLE_EXAMPLES)
 
     SuilScc(Rpc-Example
             SOURCES  generator/example/kvstore.scc
-            DEPENDS  Rpc-Generator
+            DEPENDS  Rpc-Generator scc-bin
             OUTDIR   ${CMAKE_BINARY_DIR}/scc/private/suil/rpc/generator
             LIB_PATH ${CMAKE_BINARY_DIR})
     set_target_properties(Rpc-Example
         PROPERTIES
             RUNTIME_OUTPUT_NAME rpc-ex)
-    target_link_libraries(Rpc-Example Suil::Rpc)
+    target_link_libraries(Rpc-Example Suil::Rpc Suil::Scc)
     target_include_directories(Rpc-Example
-            PRIVATE generator/example ${CMAKE_BINARY_DIR}/scc/public ${CMAKE_BINARY_DIR}/scc/private)
+            PRIVATE generator/example
+                    ${CMAKE_BINARY_DIR}/scc/public
+                    ${CMAKE_BINARY_DIR}/scc/private)
 endif()

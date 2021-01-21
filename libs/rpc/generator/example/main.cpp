@@ -7,7 +7,7 @@
 #include "suil/rpc/srpc/server.hpp"
 #include "kvstore.hpp"
 #include <suil/base/logging.hpp>
-#include <clipp.hpp>
+#include <scc/clipp.hpp>
 #include <iostream>
 
 namespace rpc = suil::rpc;

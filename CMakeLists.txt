@@ -5,10 +5,16 @@ project(Suil
         DESCRIPTION "This is the to level project to help with development of suil projects"
         LANGUAGES C CXX)
 
-# Configure project for C++20 support
+# Configure C++ project
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if (NOT CMAKE_BUILD_TYPE)
+    # default build type is Debug
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 # Postfix all debug libraries with -dbg
 #set(CMAKE_DEBUG_POSTFIX "-dbg")
@@ -42,23 +48,13 @@ set(SUIL_FILE_SERVER_ROUTE 1b7647618ea63937daae8ebb903e9175)
 # Configure path for loading suil cmake scripts
 set(CMAKE_MODULE_PATH
         ${CMAKE_MODULE_PATH}
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake
-        /usr/local/share/suil/cmake
-        /usr/share/suil/cmake)
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(cmake/SuilUtils.cmake)
-include(SuilScc)
-include(SuilGetOsVariant)
-
-# ThirdParty dependencies
-include(3rdParty.cmake)
+include(cmake/SuilGetOsVariant.cmake)
 
 # Get OS variant
-if (OS_VARIANT)
-    string(TOUPPER ${OS_VARIANT} OS_VARIANT)
-else()
-    set(OS_VARIANT UBUNTU)
-endif()
+SuilGetOsVariant(OS_VARIANT)
 string(TOUPPER ${CMAKE_BUILD_TYPE} SUIL_BUILD_TYPE)
 
 # Create a version file
@@ -86,13 +82,36 @@ find_package(Zmq REQUIRED)
 find_package(LuaS REQUIRED)
 find_package(Dl REQUIRED)
 
-# Grab libmill
+
 include(FetchContent)
+
+# Fetch libmill library
 FetchContent_Declare(
         libmill
         GIT_REPOSITORY https://gitlab.com/sw-devel/thirdparty/libmill.git)
-FetchContent_Populate(libmill)
-add_subdirectory(${libmill_SOURCE_DIR} ${libmill_BINARY_DIR})
+
+# Fetch Iod project
+FetchContent_Declare(
+        iod
+        GIT_REPOSITORY https://gitlab.com/sw-devel/thirdparty/iod.git)
+
+# Fetch Scc project
+FetchContent_Declare(
+    scc
+    GIT_REPOSITORY https://github.com/dccarter/scc.git
+    GIT_TAG main)
+
+FetchContent_MakeAvailable(libmill iod scc)
+set(CMAKE_MODULE_PATH
+        ${CMAKE_MODULE_PATH}
+        ${scc_SOURCE_DIR}/cmake)
+
+set(SUIL_SCC_DEFAULT_BINARY ${scc_BINARY_DIR}/scc)
+include(SuilScc)
+
+if (ENABLE_UNIT_TESTS)
+    include(Catch.cmake)
+endif()
 
 set(NAMESPACE      Suil::)
 set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
