@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           cd ${{runner.workspace}}/build
-          make deps -j4
+          make catch -j4
 
       # Build project
       - name: Build
