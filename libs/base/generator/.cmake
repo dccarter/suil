@@ -6,7 +6,8 @@ set(SBG_SOURCES
 
 SuilSccGenerator(Base-Generator
         OUTPUT_NAME sbg
-        SOURCES ${SBG_SOURCES})
+        SOURCES ${SBG_SOURCES}
+        DEPENDS scc-bin)
 
 set_target_properties(Base-Generator
     PROPERTIES
