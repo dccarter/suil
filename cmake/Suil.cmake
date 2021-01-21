@@ -25,9 +25,9 @@ if (NOT SUIL_INCLUDED)
         endif()
 
         set(options EXPORTS)
-        set(kvargs  VERSION SCC_OUTDIR)
+        set(kvargs  SCC_OUTDIR)
         set(kvvargs SUIL_LIBS SCC_SOURCES PRIV_SCC_SOURCES)
-        cmake_parse_arguments(SUIL_PROJECT "" "${kvargs}" "${kvvargs}" ${ARGN})
+        cmake_parse_arguments(SUIL_PROJECT "${options}" "${kvargs}" "${kvvargs}" ${ARGN})
 
         include(CheckSymbolExists)
         include(CheckFunctionExists)
@@ -51,10 +51,7 @@ if (NOT SUIL_INCLUDED)
         endif()
 
         # Configure project version
-        if (NOT SUIL_PROJECT_VERSION)
-            set(SUIL_PROJECT_VERSION "${CMAKE_PROJECT_VERSION}")
-        endif()
-        set(SUIL_PROJECT_VERSION ${SUIL_PROJECT_VERSION} PARENT_SCOPE)
+        set(SUIL_PROJECT_VERSION ${CMAKE_PROJECT_VERSION} PARENT_SCOPE)
 
         set(SUIL_SCC_PLUGINS_DIR ${CMAKE_CURRENT_BINARY_DIR} PARENT_SCOPE)
         if (SUIL_BASE_PATH)
@@ -65,30 +62,42 @@ if (NOT SUIL_INCLUDED)
             set(SUIL_PROJECT_SCC_OUTDIR ${CMAKE_BINARY_DIR}/scc)
         endif()
         set(SUIL_PROJECT_SCC_OUTDIR ${SUIL_PROJECT_SCC_OUTDIR} PARENT_SCOPE)
-        set(SUIL_PROJECT_SCC_PUB ${SUIL_PROJECT_SCC_OUTDIR}/public PARENT_SCOPE)
-        set(SUIL_PROJECT_SCC_PRIV ${SUIL_PROJECT_SCC_OUTDIR}/private PARENT_SCOPE)
 
-        if (SUIL_PROJECT_SCC_SOURCES OR SUIL_PROJECT_PRIV_SCC_SOURCES)
+        if (SUIL_PROJECT_SCC_SOURCES)
+            set(SUIL_PROJECT_SCC_PUB  ${SUIL_PROJECT_SCC_OUTDIR}/public PARENT_SCOPE)
+            if (SUIL_PROJECT_SCC_SUFFIX)
+                set(SUIL_PROJECT_SCC_PUB ${SUIL_PROJECT_SCC_PUB}/${SUIL_PROJECT_SCC_SUFFIX})
+            endif()
             SuilScc(${name}
                 PROJECT  0N
                 SOURCES       ${SUIL_PROJECT_SCC_SOURCES}
-                PRIV_SOURCES  ${SUIL_PROJECT_PRIV_SCC_SOURCES}
                 LIB_PATH      ${SUIL_SCC_PLUGINS_DIR}
-                OUTDIR        ${SUIL_PROJECT_SCC_OUTDIR})
+                OUTDIR        ${SUIL_PROJECT_SCC_PUB})
+        endif()
+        if (SUIL_PROJECT_PRIV_SCC_SOURCES)
+            set(SUIL_PROJECT_SCC_PRIV ${SUIL_PROJECT_SCC_OUTDIR}/private PARENT_SCOPE)
+            SuilScc(${name}
+                    PROJECT  0N
+                    PRIVATE  ON
+                    SOURCES       ${SUIL_PROJECT_PRIV_SCC_SOURCES}
+                    LIB_PATH      ${SUIL_SCC_PLUGINS_DIR}
+                    OUTDIR        ${SUIL_PROJECT_SCC_PRIV})
         endif()
 
         set(NAMESPACE ${name}:: PARENT_SCOPE)
         set(TARGETS_EXPORT_NAME  ${name}Targets PARENT_SCOPE)
 
         if (SUIL_PROJECT_EXPORTS)
+            include(CMakePackageConfigHelpers)
+
             set(GENERATED_DIR  ${CMAKE_BINARY_DIR}/generated)
             set(VERSION_CONFIG ${GENERATED_DIR}/${name}ConfigVersion.cmake)
             set(PROJECT_CONFIG ${GENERATED_DIR}/${name}Config.cmake)
 
             # Install SCC public header files if any
             if (SUIL_PROJECT_SCC_SOURCES)
-                install(FILES ${SUIL_PROJECT_SCC_OUTDIR}/public
-                        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                install(DIRECTORY ${SUIL_PROJECT_SCC_OUTDIR}/public/
+                        DESTINATION include/${name}
                         FILES_MATCHING PATTERN "*.hpp")
             endif()
             # Configure '<PROJECT-NAME>Config.cmake.in'
@@ -103,11 +112,6 @@ if (NOT SUIL_INCLUDED)
 
             # Install version config
             install(FILES ${PROJECT_CONFIG} ${VERSION_CONFIG}
-                    DESTINATION lib/cmake/${name}})
-
-            # Install target exports
-            install(EXPORT      ${TARGETS_EXPORT_NAME}
-                    NAMESPACE   ${NAMESPACE}
                     DESTINATION lib/cmake/${name})
         endif()
 
@@ -130,7 +134,7 @@ if (NOT SUIL_INCLUDED)
         cmake_parse_arguments(SUIL_TARGET "${options}" "${kvargs}" "${kvvargs}" ${ARGN})
 
         # Get the source files
-        set(${name}_SOURCES ${SUIL_TARGET_SOURCES})
+        set(${_name}_SOURCES ${SUIL_TARGET_SOURCES})
         if (NOT SUIL_TARGET_SOURCES AND NOT SUIL_TARGET_TEST)
             file(GLOB_RECURSE ${_name}_SOURCES src/*.c src/*.cpp src/*.cc)
             # If target is a test, add test sources
@@ -241,6 +245,14 @@ if (NOT SUIL_INCLUDED)
 
         if (SUIL_TARGET_INSTALL)
             if (SUIL_TARGET_LIBRARY)
+                if (NOT SUIL_TARGETS_EXPORTED)
+                    # Install target exports
+                    install(EXPORT      ${TARGETS_EXPORT_NAME}
+                            NAMESPACE   ${NAMESPACE}
+                            DESTINATION lib/cmake/${name})
+                    set(SUIL_TARGETS_EXPORTED ON PARENT_SCOPE)
+                endif()
+
                 # Install library in exported target
                 install(TARGETS ${name}
                         EXPORT  ${TARGETS_EXPORT_NAME}
