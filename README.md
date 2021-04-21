@@ -87,10 +87,11 @@ Everything in `suil` is developed with coroutines in mind (thanks to Libmill). I
 This will be done right once the docs site is done. But for an overview,
 testing on my laptop yields the following results
 ##### Environment
-* Ubuntu 20.04.1 LTS (application running on docker container)
-* Lenovo T460s Intel(R) Core(TM) i7-6600U CPU @ 2.60GHz
-  - 2 cores, 2 threads
+* OSX BigSur LTS (application running on docker container)
+* 2.8 GHz Quad-Core Intel Core i7
+  - 4 cores, 8 threads
   - 12Gb RAM
+* Application configured with 6 threads
 * [wrk2](https://github.com/giltene/wrk2) master running on same machine
 
 ### Application output
@@ -102,7 +103,7 @@ KeepAlive: 300000
 Strict-Transport-Security: max-age 3600; includeSubdomains
 Content-Type: application/json
 Server: Suil-Http-Server
-Date: Tue, 05 Jan 2021 07:17:10 GMT
+Date: Wed, 21 Apr 2021 01:12:38 GMT
 Content-Length: 11
 
 Hello World
@@ -110,15 +111,15 @@ Hello World
 
 ### Benchmark results
 ```bash
-wrk -R1M  -c127 http://localhost:8000/hello
-Running 10s test @ http://localhost:8000/hello
-  2 threads and 127 connections
+wrk -t3 -c1000 -R1M http://0.0.0.0:8000/hello
+Running 10s test @ http://0.0.0.0:8000/hello
+  3 threads and 1000 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     4.27s     2.71s    9.47s    56.86%
+    Latency     3.32s     1.96s    7.35s    58.71%
     Req/Sec       -nan      -nan   0.00      0.00%
-  444196 requests in 10.00s, 102.52MB read
-Requests/sec:  44420.97
-Transfer/sec:     10.25MB
+  2003273 requests in 10.00s, 473.80MB read
+Requests/sec: 200347.19
+Transfer/sec:     47.38MB
 ```
 
 ## Giving credits where they are due
