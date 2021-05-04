@@ -206,6 +206,24 @@ namespace suil {
         return status;
     }
 
+    Status<String> File::readLine(const Deadline& dd)
+    {
+        Buffer ob{256};
+        while (true) {
+            ob.reserve(1);
+            size_t ret  = mfread(fd, &ob.data()[ob.size()], 1, dd);
+            if (errno) {
+                return {errno};
+            }
+            if (ob.data()[ob.size()] == '\n') {
+                break;
+            }
+            ob.seek(1);
+        }
+
+        return Ok(String{ob});
+    }
+
 
     size_t File::write(
             const void *buf,

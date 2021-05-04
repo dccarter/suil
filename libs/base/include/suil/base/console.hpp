@@ -8,6 +8,8 @@
 #include <cstdarg>
 #include <cinttypes>
 
+#include <suil/base/file.hpp>
+
 namespace suil::Console {
 
     /**
@@ -127,5 +129,10 @@ namespace suil::Console {
      * @param ... format arguments
      */
     void warn(const char *fmt, ...);
+
+    /**
+     * Return the input/output file stream
+     */
+    File& in();
 }
 #endif //SUIL_BASE_CONSOLE_HPP

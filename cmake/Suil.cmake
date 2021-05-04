@@ -9,6 +9,7 @@ if (NOT SUIL_INCLUDED)
     if (SUIL_BASE_PATH)
         set(CMAKE_PREFIX_PATH ${SUIL_BASE_PATH}/lib/cmake)
         set(SUIL_SCC_DEFAULT_BINARY ${SUIL_BASE_PATH}/bin/scc)
+        set(SUIL_SCC_DEFAULT_LIB_PATH ${${SUIL_BASE_PATH}/lib})
     endif()
 
     ##
@@ -41,6 +42,7 @@ if (NOT SUIL_INCLUDED)
         find_package(Libmill REQUIRED)
         find_package(Iod REQUIRED)
         find_package(Scc REQUIRED)
+        find_package(Zmq REQUIRED)
         find_package(Suil)
 
         # Configure project version
@@ -48,7 +50,7 @@ if (NOT SUIL_INCLUDED)
 
         set(SUIL_SCC_PLUGINS_DIR ${CMAKE_CURRENT_BINARY_DIR})
         if (SUIL_BASE_PATH)
-            set(SUIL_SCC_PLUGINS_DIR ${SUIL_SCC_PLUGINS_DIR} ${SUIL_BASE_PATH}/lib)
+            set(SUIL_SCC_PLUGINS_DIR "${SUIL_SCC_PLUGINS_DIR}:${SUIL_BASE_PATH}/lib")
         endif()
 
         if (NOT SUIL_PROJECT_SCC_OUTDIR)

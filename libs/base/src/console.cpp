@@ -111,4 +111,17 @@ namespace suil::Console {
         printf("\n");
         va_end(args);
     }
+
+    class Input : public File {
+    public:
+        Input()
+            : File(STDIN_FILENO)
+        {}
+    };
+
+    File& in()
+    {
+        static Input sIn;
+        return sIn;
+    }
 }
