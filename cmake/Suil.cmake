@@ -64,7 +64,7 @@ if (NOT SUIL_INCLUDED)
                 set(SUIL_PROJECT_SCC_PUB ${SUIL_PROJECT_SCC_PUB}/${SUIL_PROJECT_SCC_SUFFIX})
             endif()
             SuilScc(${name}
-                PROJECT  0N
+                PROJECT  ON
                 SOURCES       ${SUIL_PROJECT_SCC_SOURCES}
                 LIB_PATH      ${SUIL_SCC_PLUGINS_DIR}
                 OUTDIR        ${SUIL_PROJECT_SCC_PUB})
@@ -73,7 +73,7 @@ if (NOT SUIL_INCLUDED)
             set(SUIL_PROJECT_SCC_PRIV ${SUIL_PROJECT_SCC_OUTDIR}/private)
             message(STATUS ${SUIL_PROJECT_SCC_PRIV})
             SuilScc(${name}
-                    PROJECT  0N
+                    PROJECT  ON
                     PRIVATE  ON
                     SOURCES       ${SUIL_PROJECT_PRIV_SCC_SOURCES}
                     LIB_PATH      ${SUIL_SCC_PLUGINS_DIR}
