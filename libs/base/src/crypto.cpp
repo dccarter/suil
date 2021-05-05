@@ -241,7 +241,7 @@ namespace suil::crypto {
             auto csumed = malloc(len+4);
             auto csumptr = &((uint8_t*)csumed)[len];
             memcpy(csumed, data, len);
-            memcpy(csumptr, &hash.cbin(), 4);
+            memcpy(csumptr, &hash.bin(), 4);
             auto tmp = computeBase58(csumed, len+4);
             free(csumed);
             return tmp;
@@ -282,9 +282,9 @@ namespace suil::crypto {
             : ecKey(other.ecKey)
     {
         other.ecKey = nullptr;
-        if (!other.privKey.nil())
+        if (!other.privKey.isnil())
             Ego.privKey.copyfrom(other.privKey);
-        if (!other.pubKey.nil())
+        if (!other.pubKey.isnil())
             Ego.pubKey.copyfrom(other.pubKey);
     }
 
@@ -292,9 +292,9 @@ namespace suil::crypto {
     {
         Ego.ecKey = other.ecKey;
         other.ecKey = nullptr;
-        if (!other.privKey.nil())
+        if (!other.privKey.isnil())
             Ego.privKey.copyfrom(other.privKey);
-        if (!other.pubKey.nil())
+        if (!other.pubKey.isnil())
             Ego.pubKey.copyfrom(other.pubKey);
         return Ego;
     }
@@ -380,7 +380,7 @@ namespace suil::crypto {
             return nullptr;
         }
         EC_KEY_set_conv_form(key, POINT_CONVERSION_COMPRESSED);
-        auto bin = &pub.cbin();
+        auto bin = &pub.bin();
         if (o2i_ECPublicKey(&key, &bin, pub.size()) == nullptr) {
             EC_KEY_free(key);
             return nullptr;
@@ -396,7 +396,7 @@ namespace suil::crypto {
             return {};
         }
 
-        auto privateKey = BN_bin2bn(&priv.cbin(), priv.size(), nullptr);
+        auto privateKey = BN_bin2bn(&priv.bin(), priv.size(), nullptr);
         if (privateKey == nullptr) {
             serror("load private key failure %d %d", __LINE__, ERR_get_error());
             EC_KEY_free(key);
@@ -478,7 +478,7 @@ namespace suil::crypto {
 
     suil::String ECDSASignature::toCompactForm(bool b64) const
     {
-        auto b = &Ego.cbin();
+        auto b = &Ego.bin();
         auto sig= d2i_ECDSA_SIG(nullptr, &b, Ego.size());
         if (sig == nullptr) {
             serror("saving signature failed: %d %d", __LINE__, ERR_get_error());
@@ -613,7 +613,7 @@ namespace suil::crypto {
                 return {};
             };
 
-            if (ECDSA_SIG_recover_key_GFp(ecKey, signature, (unsigned char*)&digest.cbin(), digest.size(), i, 1) == 1) {
+            if (ECDSA_SIG_recover_key_GFp(ecKey, signature, (unsigned char*)&digest.bin(), digest.size(), i, 1) == 1) {
                 PublicKey pub;
                 key2pub(pub, ecKey);
                 if (pub == key.getPublicKey()) {
@@ -640,7 +640,7 @@ namespace suil::crypto {
             serror("verifying signature failed: %d %d", __LINE__, ERR_get_error());
             return false;
         }
-        auto bin = &sig.cbin();
+        auto bin = &sig.bin();
         auto signature = d2i_ECDSA_SIG(nullptr, &bin, sig.size());
         if (signature == nullptr) {
             serror("verifying signature failed: %d %d", __LINE__, ERR_get_error());
@@ -685,9 +685,9 @@ TEST_CASE("suil::crypto", "[crypto]")
 
         WHEN("Loading keys from string") {
             auto priv2 = sc::PrivateKey::fromString(priv1Str);
-            REQUIRE_FALSE(priv2.nil());
+            REQUIRE_FALSE(priv2.isnil());
             auto pub2 = sc::PublicKey::fromString(pub1Str);
-            REQUIRE_FALSE(priv2.nil());
+            REQUIRE_FALSE(priv2.isnil());
 
             auto key3 = sc::ECKey::fromKey(priv2);
             REQUIRE(key3.isValid());
