@@ -34,7 +34,7 @@ install(TARGETS HttpServer HttpClient
 # Install includes library
 install(DIRECTORY include/suil/http/
         DESTINATION include/suil/http
-        FILES_MATCHING PATTERN "*.hpp")
+        FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
 install(DIRECTORY ${CMAKE_BINARY_DIR}/scc/public/suil/http/
         DESTINATION include/suil/http
         FILES_MATCHING PATTERN "*.hpp")
