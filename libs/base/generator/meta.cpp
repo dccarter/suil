@@ -177,6 +177,9 @@ namespace suil {
                         fmt(true) << ", ";
                     }
                     attrib.scopedString(fmt, "var");
+                    if (attrib.Params.size() == 1) {
+                        fmt(true) << " = var(" << attrib.Params[0].Content << ")";
+                    }
                 }
                 fmt(true) << ")";
             }

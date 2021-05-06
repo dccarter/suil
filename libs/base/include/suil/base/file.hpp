@@ -107,6 +107,15 @@ namespace suil {
                 void *data,
                 size_t& size,
                 const Deadline& dd = Deadline::infinite());
+
+        /**
+         * Reads data from a file until the end of line character is seen
+         * @param dd deadline for the read
+         * @return result from readline, error code will be 0 for success and
+         * the result will be set read input
+         */
+        virtual Status<String> readLine(const Deadline& dd = Deadline::infinite());
+
         /**
          * file seek to given offset
          * @param off the offset to seek to

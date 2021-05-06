@@ -37,7 +37,7 @@ namespace suil::crypto {
          * @return a hex string representation of the buffer
          */
         virtual suil::String toString() const {
-            return suil::hexstr(&Ego.cbin(), Ego.size());
+            return suil::hexstr(&Ego.bin(), Ego.size());
         }
 
         /**

@@ -74,7 +74,7 @@ namespace suil {
         };
 
         template <size_t S=0, size_t E = N>
-        void szero() {
+        void zero() {
             static_assert(((E>S)&&(E<=N)), "invalid zeroing indices");
             memset(&Ego.begin()[S], 0, E-S);
         }
@@ -86,7 +86,7 @@ namespace suil {
         }
 
         template <size_t S=0, size_t C=N>
-        inline bool nil() const {
+        inline bool isnil() const {
             static_assert((C<=N)&&((C+S)<=N), "null check range ins invalid");
             size_t offset{S};
             for(; offset < S+C; offset++)
@@ -102,7 +102,7 @@ namespace suil {
         }
 
         template <size_t I=0>
-        inline const uint8_t& cbin() const {
+        inline const uint8_t& bin() const {
             static_assert(I<N, "index should be less than size");
             return Ego.begin()[I];
         }

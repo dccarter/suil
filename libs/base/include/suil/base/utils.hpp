@@ -14,6 +14,7 @@
 #include <string_view>
 #include <cstring>
 #include <concepts>
+#include <utility>
 
 #ifndef suil_ut
 #define suil_ut
@@ -519,6 +520,18 @@ namespace suil {
 
     template <typename T>
     using ConstVec = const _ConstVec<T>;
+
+    template <typename T, typename E = int, E e = 0>
+        requires (std::is_default_constructible_v<T> &&
+                  std::is_default_constructible_v<E> &&
+                 (std::is_enum_v<E> || std::is_integral_v<E>))
+    struct Status {
+        E error{e};
+        T result;
+    };
+
+    template <typename T, typename E = int, E ok = 0>
+    Status<T, E> Ok(T t) { return { ok, std::move(t) }; }
 }
 
 #endif //SUIL_BASE_UTILS_HPP
