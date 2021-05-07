@@ -34,25 +34,26 @@ namespace suil::net::zmq {
         return true;
     }
 
-    void SocketMonitor::waitForEvents(SocketMonitor& S)
-    {
+    void SocketMonitor::waitForEvents(SocketMonitor& S) {
         ldebug(&S, "Starting wait for events %s", S._sock.id()());
         S._waiting = true;
 
         while (S._connected and S._sock) {
             Message msg;
             if (!S._sock.receive(msg)) {
-                ldebug(&S, "%s: waiting for events failed, aborting", S._sock.id()());
+                if (S._connected) {
+                    ldebug(&S, "%s: waiting for events failed, aborting", S._sock.id()());
+                }
                 break;
             }
-            if (msg.empty() or msg.back().size() < sizeof (Event)) {
+            if (msg.empty() or msg.back().size() < sizeof(Event)) {
                 ldebug(&S, "%s: received an empty/invalid event", S._sock.id()());
                 continue;
             }
-            auto& frame = msg.back();
+            auto &frame = msg.back();
             Event event{0, 0};
             String addr;
-            auto data = static_cast<const char*>(frame.data());
+            auto data = static_cast<const char *>(frame.data());
 #if ZMQ_VERSION_MAJOR >= 4
             memcpy(&event.ev, data, sizeof(int16));
             data += sizeof(int16);
@@ -72,8 +73,8 @@ namespace suil::net::zmq {
 
 #if ZMQ_VERSION >= ZMQ_MAKE_VERSION(3, 3, 0)
             if (msg.size() > 1) {
-                auto& f2 = msg[1];
-                addr = String{static_cast<const char*>(f2.data()), f2.size(), false}.dup();
+                auto &f2 = msg[1];
+                addr = String{static_cast<const char *>(f2.data()), f2.size(), false}.dup();
             }
 #else
             addr = String{data, frame.size(), false}.dup();
@@ -87,7 +88,7 @@ namespace suil::net::zmq {
             S.stop();
         }
 
-        S._waiterCond.notifyOne();
+        S._waiterEvent.notifyOne();
     }
 
     void SocketMonitor::stop()
@@ -101,7 +102,7 @@ namespace suil::net::zmq {
         if (Ego._waiting) {
             // Wait for the coroutine to exit
             Sync sync;
-            Ego._waiterCond.wait(sync);
+            Ego._waiterEvent.wait();
         }
     }
 }

@@ -10,6 +10,8 @@
 #include <suil/base/channel.hpp>
 #include <suil/base/signal.hpp>
 
+#include <libmill/libmill.hpp>
+
 namespace suil::net::zmq {
 
     class SocketMonitor : LOGGER(ZMQ_SOCK) {
@@ -37,9 +39,10 @@ namespace suil::net::zmq {
 
         // Only need a pair socket that can connect and receive
         OperatedSocket<Socket::Pair, ConnectOperator, ReceiveOperator> _sock;
-        bool _connected{false};
-        bool _waiting{false};
-        Conditional _waiterCond;
+        std::atomic_bool _connected{false};
+        std::atomic_bool _waiting{false};
+        mill::Mutex _waiterMutex;
+        mill::Event _waiterEvent{};
     };
 }
 

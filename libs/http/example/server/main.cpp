@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
                         hs::SystemAttrs,        // System level attributes
                         hs::Cors,               // CORS
                         hs::JwtAuthorization,   // Enable JWT authorization
-                        hs::RedisMiddleware,    // Provides access to a redis databas
+                        hs::RedisMiddleware,    // Provides access to a redis database
                         hs::JwtSession          // Caches JWT's
                     >;
 
@@ -80,7 +80,9 @@ int main(int argc, char *argv[])
             if (it == users.end()) {
                 // Dead & Gone
                 resp.end(suil::http::Forbidden);
+                return;
             }
+
             // Just need to create a new token and return it the user
             auto& [name, user] = *it;
             Jwt jwt{};
