@@ -34,11 +34,11 @@ namespace suil::http {
         sApis.emplace(Ego._id, *this);
     }
 
-    WebSock* WebSockApi::find(const String& uuid)
+    std::shared_ptr<WebSock> WebSockApi::find(const String& uuid)
     {
         auto it = Ego._webSocks.find(uuid);
         if (it != Ego._webSocks.end()) {
-            return &it->second.get();
+            return it->second;
         }
         return nullptr;
     }
@@ -55,38 +55,33 @@ namespace suil::http {
         strace("WebSockApi::broadcast src %p, data %p, size %lu",
                src, data, size);
 
-        Channel<int> async{-1};
-        uint32 wait = 0;
-
         auto msg = reinterpret_cast<const WsockBcastMsg *>(data);
+        auto snap = Ego.snapshot();
+        for (auto& weak : snap) {
+            auto ws = weak.lock();
+            if (ws == nullptr) {
+                continue;
+            }
 
-        for (auto& ws : Ego._webSocks) {
-            if (&ws.second.get() != src) {
-                if (Ego._blockingBroadcast or Ego._webSocks.size() == 2) {
-                    // there is no need to spawn go-routines if there is only
-                    // one other sock or in blocking mode
-                    auto& wsock = ws.second.get();
-                    if (!wsock.broadcastSend(msg->payload, msg->len)) {
-                        ltrace(&wsock, "sending web socket message failed");
-                    }
-                } else {
-                    wait++;
-                    go(broadcastSend(async, ws.second, msg->payload, msg->len));
+            if (ws.get() != src) {
+                auto& wsock = *ws;
+                if (!wsock.broadcastSend(msg->payload, msg->len)) {
+                    ltrace(&wsock, "sending web socket message failed");
                 }
             }
         }
 
-        strace("waiting for %u-local to complete %ld", wait, mnow());
-        // wait for transactions to complete
-        async(wait) | Void;
         strace("web socket broadcast completed %ld", mnow());
     }
 
-    void WebSockApi::broadcastSend(Channel<int>& ch, WebSock& ws, const void* data, size_t len)
+    WebSockApi::WebSockSnapshot WebSockApi::snapshot()
     {
-        auto result = ws.broadcastSend(data, len);
-        if (ch)
-            ch << result;
+        mill::Lock lk{Ego._mutex};
+        WebSockSnapshot snap;
+        for (auto& [_, ws]: _webSocks) {
+            snap.push_back(ws);
+        }
+        return snap;
     }
 
     WebSock::~WebSock() noexcept
@@ -150,12 +145,12 @@ namespace suil::http {
             rq.clear();
 
             // Create a web socket
-            WebSock ws(rq.sock(), api, size);
+            std::shared_ptr<WebSock> ws{new WebSock(rq.sock(), api, size)};
             // notify API that websocket has been created
             if (created)
-                created(ws);
+                created(*ws);
 
-            ws.handle();
+            ws->handle();
             return true;
         });
 
@@ -282,10 +277,13 @@ namespace suil::http {
         }
 
         Ego._uuid = suil::uuidstr();
-        Ego._api._webSocks.emplace(Ego._uuid.peek(), *this);
-        Ego._api._totalSocks++;
+        {
+            mill::Lock lk{Ego._api._mutex};
+            Ego._api._webSocks.emplace(Ego._uuid.peek(), shared_from_this());
+            Ego._api._totalSocks++;
+        }
 
-        idebug("%s - entering Connection loop %lu", Ego._uuid(), Ego._api._totalSocks);
+        idebug("%s - entering Connection loop", Ego._uuid());
 
         Buffer b(0);
         while (!Ego._endSession && Ego._sock.isOpen()) {
@@ -332,10 +330,12 @@ namespace suil::http {
         }
 
         // remove from list of know web sockets
-        Ego._api._webSocks.erase(Ego._uuid);
-        Ego._api._totalSocks--;
-
-        itrace("%s - done handling web socket %hhu", Ego._uuid(), Ego._api._totalSocks);
+        {
+            mill::Lock lk{Ego._api._mutex};
+            Ego._api._webSocks.erase(Ego._uuid);
+            Ego._api._totalSocks--;
+        }
+        itrace("%s - done handling web socket", Ego._uuid());
 
         // definitely disconnecting
         if (Ego._api.onDisconnect) {
@@ -380,6 +380,11 @@ namespace suil::http {
             }
         }
 
+        Ego._mutex.acquire();
+        defer({
+            Ego._mutex.release();
+        });
+
         // send header
         if (Ego._sock.send(hbuf, hlen, Ego._api._timeout) != hlen) {
             itrace("%s - sending header of length %hhu failed: %s",
@@ -403,7 +408,13 @@ namespace suil::http {
             iwarn("attempting to send to a closed websocket");
             return false;
         }
+
         size_t totalSent = 0;
+        Ego._mutex.acquire();
+        defer({
+           Ego._mutex.release();
+        });
+
         do {
             auto sent = Ego._sock.send(data, len, Ego._api._timeout);
             if (!sent) {
@@ -463,15 +474,15 @@ namespace suil::http {
             // the copied buffer now belongs to the go-routine
             // being scheduled
             size_t len = sizeof(WsockBcastMsg)+msg->len;
-            go(broadcast(*this, Ego._api, copy, len));
+            go(broadcast(shared_from_this(), Ego._api, copy, len));
         }
     }
 
-    void WebSock::broadcast(WebSock& ws, WebSockApi& api, void* data, size_t size)
+    void WebSock::broadcast(std::shared_ptr<WebSock> ws, WebSockApi& api, void* data, size_t size)
     {
         strace("WebSock::broadcast data %p size %lu", data, size);
         // use the api to broadcast to all connected web sockets
-        api.broadcast(&ws, data, size);
+        api.broadcast(ws.get(), data, size);
         // free the allocated memory
         strace("done broadcasting message %p", data);
         free(data);

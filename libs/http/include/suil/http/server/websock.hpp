@@ -11,6 +11,8 @@
 #include <suil/base/channel.hpp>
 #include <suil/base/signal.hpp>
 
+#include <libmill/libmill.hpp>
+
 namespace suil::http {
 
     class WebSock;
@@ -29,18 +31,20 @@ namespace suil::http {
         CloseHandler   onClose;
         MessageHandler onMessage;
 
-        WebSock* find(const String& uuid);
+        std::shared_ptr<WebSock> find(const String& uuid);
 
     private:
         friend class WebSock;
         void broadcast(WebSock* src, const void *data, size_t size);
         static coroutine void   send(chan ch, WebSock& ws, const void *data, size_t sz, uint8 op);
-        static coroutine void   broadcastSend(Channel<int>&, WebSock& ws, const void *data, size_t len);
-
-        UnorderedMap<std::reference_wrapper<WebSock>>    _webSocks{};
+        using WebSockMap = UnorderedMap<std::shared_ptr<WebSock>>;
+        using WebSockSnapshot = std::vector<std::weak_ptr<WebSock>>;
+        WebSockSnapshot snapshot();
+        WebSockMap   _webSocks{};
         size_t  _totalSocks{0};
         uint8 _id{0};
         int64  _timeout{-1};
+        mill::Mutex _mutex{};
         bool _blockingBroadcast{true};
     };
 
@@ -66,7 +70,7 @@ namespace suil::http {
     using WebSockCreated = std::function<void(WebSock&)>;
 
     define_log_tag(WEB_SOCKET);
-    class WebSock : LOGGER(WEB_SOCKET) {
+    class WebSock : LOGGER(WEB_SOCKET), public std::enable_shared_from_this<WebSock> {
     public:
         typedef enum  : uint8_t  {
             Cont    = 0x00,
@@ -151,18 +155,18 @@ namespace suil::http {
 
         virtual bool receiveOpcode(header& h);
         virtual bool receiveFrame(header& h, Buffer& b);
-
         net::Socket&      _sock;
         WebSockApi&       _api;
         bool              _endSession{false};
         void              *_data{nullptr};
         String             _uuid{};
+        mill::Mutex _mutex{};
     private:
         friend struct WebSockApi;
         void handle();
         bool broadcastSend(const void *data, size_t len);
         static coroutine void broadcast(
-                WebSock& ws, WebSockApi& api, void *data, size_t size);
+                std::shared_ptr<WebSock> ws, WebSockApi& api, void *data, size_t size);
     };
 
     namespace ws {
