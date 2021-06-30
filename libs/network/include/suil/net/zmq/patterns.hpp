@@ -15,10 +15,10 @@ namespace suil::net::zmq {
     using RequestSocket = OperatedSocket<Socket::Type::Req,
                             ConnectOperator, SendOperator, ReceiveOperator, MonitorOperator>;
 
-    using DealerSocket = OperatedSocket<Socket::Type::Req,
+    using DealerSocket = OperatedSocket<Socket::Type::Dealer,
                             BindOperator, ConnectOperator, SendOperator, ReceiveOperator, MonitorOperator>;
 
-    using RouterSocket = OperatedSocket<Socket::Type::Req,
+    using RouterSocket = OperatedSocket<Socket::Type::Router,
                             BindOperator, ConnectOperator, SendOperator, ReceiveOperator, MonitorOperator>;
 
 
@@ -26,8 +26,10 @@ namespace suil::net::zmq {
                             BindOperator, SendOperator, MonitorOperator>;
 
     using PairSocket    = OperatedSocket<Socket::Pair,
-                            BindOperator, SendOperator, MonitorOperator>;
+                            BindOperator, ConnectOperator, SendOperator, ReceiveOperator, MonitorOperator>;
 
+    using PushSocket    = OperatedSocket<Socket::Push,
+                            ConnectOperator, SendOperator>;
 
     class SubscribeSocket : public OperatedSocket<Socket::Sub, ConnectOperator, ReceiveOperator, MonitorOperator> {
     public:

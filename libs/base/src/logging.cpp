@@ -217,8 +217,9 @@ namespace suil {
         DefaultWriter{}(log, size, level);
     }
 
-    Syslog::Syslog(const char *name) {
-        openlog("suil", LOG_PID | LOG_CONS, LOG_USER);
+    Syslog::Syslog(const char *name)
+    {
+        openlog(name, LOG_PID | LOG_CONS, LOG_USER);
     }
 
     void Syslog::close() {

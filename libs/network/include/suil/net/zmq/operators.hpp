@@ -79,9 +79,12 @@ namespace suil::net::zmq {
             }
         }
 
+        bool isConnected() const { return mConnected != 0; }
+
     private:
         bool doConnect(const String& endpoint);
         void doDisconnect(const String& endpoint);
+        uint16 mConnected{0};
     };
 
     class BindOperator {

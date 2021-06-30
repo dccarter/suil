@@ -10,6 +10,7 @@ namespace suil::net::zmq {
     bool ConnectOperator::doConnect(const String& endpoint)
     {
         if (!sock()) {
+            mConnected = 0;
             lwarn(&sock(), "SendOperator::doConnect(...) socket is invalid");
             return false;
         }
@@ -18,6 +19,7 @@ namespace suil::net::zmq {
             lwarn(&sock(), "BindOperator::doConnect(...) zmq_connect failed: %s", zmq_strerror(zmq_errno()));
             return false;
         }
+        mConnected++;
 
         return true;
     }
@@ -25,6 +27,7 @@ namespace suil::net::zmq {
     void ConnectOperator::doDisconnect(const String& endpoint)
     {
         if (!sock()) {
+            mConnected = 0;
             lwarn(&sock(), "SendOperator::doDisconnect(...) socket is invalid");
             return;
         }
@@ -33,5 +36,6 @@ namespace suil::net::zmq {
             lwarn(&sock(), "BindOperator::doDisconnect(...) zmq_disconnect failed: %s", zmq_strerror(zmq_errno()));
             return;
         }
+        mConnected--;
     }
 }
