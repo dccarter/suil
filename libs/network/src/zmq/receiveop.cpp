@@ -37,8 +37,9 @@ namespace suil::net::zmq {
                         }
                         continue;
                     }
-                    lwarn(&sock(), "ReceiveOperator::receiveFlags(Message...) zmq_msg_recv failed: %s",
-                                zmq_strerror(zmq_errno()));
+                    lwarn(&sock(), "ReceiveOperator::receiveFlags(Message..., " PRIs ") zmq_msg_recv failed: %s",
+                                _PRIs(sock().id()), zmq_strerror(zmq_errno()));
+                    myield();
                     return false;
                 }
                 else {

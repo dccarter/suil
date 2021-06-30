@@ -3,8 +3,8 @@
 //
 
 #include "suil/base/process.hpp"
+#include <suil/base/syson.hpp>
 
-#include <unistd.h>
 #include <sys/wait.h>
 
 namespace {
@@ -14,7 +14,7 @@ namespace {
         if (env.empty())
             return;
 
-        for (auto ev : env) {
+        for (auto& ev : env) {
             // set environment variables
             if (!ev.first.empty())
                 setenv(ev.first(), ev.second(), true);
@@ -57,30 +57,6 @@ namespace suil {
     static std::map<pid_t, Process*> ActiveProcess{};
     size_t Process::IOBuffer::MAXIMUM_BUFFER_SIZE{0};
 
-    void processSaHandler(int sig, siginfo_t *info, void *context) {
-        static bool Exiting{false};
-        strace("signal=%d", sig);
-        if (Exiting)
-            return;
-
-        switch (sig) {
-            case SIGCHLD:
-                suil::Process::onSIGCHLD(sig, info, context);
-                break;
-            case SIGTERM:
-            case SIGINT:
-            case SIGQUIT:
-                Exiting = true;
-                suil::Process::onSIGTERM(sig, info, context);
-                exit(EXIT_SUCCESS);
-                /* UNREACHABLE */
-                break;
-            default:
-                break;
-        }
-
-    }
-
     void Process::IOBuffer::push(std::deque<String> &buf, size_t &sz, String &&s)
     {
         sz += s.size();
@@ -120,10 +96,6 @@ namespace suil {
             if ((it->second != nullptr) && it->second->waitingExit)
                 if (::write(it->second->notifChan[1], &sig, sizeof(sig)) == -1)
                     lerror(it->second, "error writing to process notif channel: %s", errno_s);
-        } else {
-            // PID not registered
-            strace("process with pid=%ld not registered or not waiting for ", pid);
-            // @TODO Worker_sa_handler(sig, info, context);
         }
     }
 
@@ -146,6 +118,11 @@ namespace suil {
             int argc,
             char *argv[])
     {
+        {
+            static Once sOnceChild, sOnceExit;
+            On({SIGNAL_QUIT, SIGNAL_TERM, SIGNAL_INT}, Process::onSIGTERM, sOnceExit);
+            On({SIGNAL_CHLD}, Process::onSIGCHLD, sOnceChild);
+        }
         int out[2], err[2], in[2];
         if (!openpipes(in, out, err))
             return nullptr;

@@ -177,7 +177,6 @@ namespace suil {
 
         static UPtr start(const UnorderedMap<String>& env, const char* cmd, int argc, char* argv[]);
 
-        friend void processSaHandler(int sig, siginfo_t *info, void *context);
         static void onSIGCHLD(int sig, siginfo_t *info, void *context);
         static void onSIGTERM(int sig, siginfo_t *info, void *context);
 

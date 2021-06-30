@@ -507,7 +507,7 @@ namespace suil {
          * @param checkCase true
          * @return
          */
-        bool ishex(int checkCase = -1 /* -1 lower, 0 no insensitive, 1 upper */);
+        bool ishex(int checkCase = -1 /* -1 lower, 0 no insensitive, 1 upper */) const;
 
         size_t maxByteSize() const;
 

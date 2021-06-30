@@ -46,19 +46,18 @@ namespace suil::net::zmq {
                 }
                 break;
             }
-            if (msg.empty() or msg.back().size() < sizeof(Event)) {
+            if (msg.empty() or msg[0].size() < sizeof(Event)) {
                 ldebug(&S, "%s: received an empty/invalid event", S._sock.id()());
                 continue;
             }
-            auto &frame = msg.back();
+            auto &frame = msg[0];
             Event event{0, 0};
             String addr;
             auto data = static_cast<const char *>(frame.data());
 #if ZMQ_VERSION_MAJOR >= 4
             memcpy(&event.ev, data, sizeof(int16));
             data += sizeof(int16);
-            memcpy(&event.ev, (data + sizeof(int16)), sizeof(int32));
-            data += sizeof(int32);
+            memcpy(&event.value, (data + sizeof(int16)), sizeof(int32));
 #else
             event = *static_cast<zmq_event *>(data);
             data += sizeof(Event);

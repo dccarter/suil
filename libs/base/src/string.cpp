@@ -379,7 +379,7 @@ namespace suil {
         return substr(from) == tmp;
     }
 
-    bool String::ishex(int checkCase)
+    bool String::ishex(int checkCase) const
     {
         strview  view = Ego;
         if (checkCase < 0) {

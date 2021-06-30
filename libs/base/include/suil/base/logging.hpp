@@ -162,7 +162,7 @@ namespace suil {
                 Ego.formatter = std::move(fmt);
             }
 
-            LogWriter::UPtr wr = options.get(sym(writer), nullptr);
+            LogWriter::Ptr wr = options.get(sym(writer), nullptr);
             if (wr != nullptr) {
                 Ego.writer = std::move(wr);
             }
@@ -186,7 +186,7 @@ namespace suil {
         void reset();
 
     private:
-        LogWriter::UPtr writer{nullptr};
+        LogWriter::Ptr writer{nullptr};
         Level lvl{DEBUG};
         LogFormat formatter{nullptr};
         char *name{nullptr};

@@ -210,7 +210,7 @@ namespace suil {
                 } while(++i != _nextExecutorIndex);
 
                 // Wait for any worker to be ready to receive work
-                idebug("All workers in backoff state, waiting for a worker to be available");
+                idebug("All workers in backoff globalState, waiting for a worker to be available");
                 _backoffEvent.wait(lk);
             }
         }

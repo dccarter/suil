@@ -81,7 +81,7 @@ find_package(Uuid REQUIRED)
 find_package(Zmq REQUIRED)
 find_package(LuaS REQUIRED)
 find_package(Dl REQUIRED)
-
+find_package(Secp256k1 REQUIRED)
 
 include(FetchContent)
 
@@ -121,6 +121,7 @@ add_subdirectory(libs/network)
 add_subdirectory(libs/database)
 add_subdirectory(libs/rpc)
 add_subdirectory(libs/http)
+add_subdirectory(libs/sawtooth)
 
 include(CMakePackageConfigHelpers)
 

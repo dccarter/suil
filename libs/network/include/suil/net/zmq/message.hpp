@@ -26,6 +26,10 @@ namespace suil::net::zmq {
             return _sent;
         }
 
+        bool empty() const {
+            return !Ego._valid || Ego.size() == 0;
+        }
+
         const void * data() const;
 
         void* data();
