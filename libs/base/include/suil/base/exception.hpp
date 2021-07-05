@@ -8,8 +8,9 @@
 #include <exception>
 #include <string>
 #include <sstream>
+#include <variant>
 
-#include "suil/base/utils.hpp"
+#include <suil/base/utils.hpp>
 
 namespace suil {
 
@@ -119,6 +120,8 @@ namespace suil {
         const std::string& mTag{};
     };
 
+#define AnT() __PRETTY_FUNCTION__, ":", __LINE__, " "
+    
 #define DECLARE_EXCEPTION(Name)                                                 \
     class Name : public suil::Exception {                                 \
     public:                                                                     \
@@ -148,6 +151,34 @@ namespace suil {
     DECLARE_EXCEPTION(IndexOutOfBounds);
     DECLARE_EXCEPTION(InvalidArguments);
     DECLARE_EXCEPTION(UnsupportedOperation);
+
+    template <typename V, typename E = Exception>
+        requires (std::is_same_v<E, Exception> || std::is_base_of_v<Exception, E>)
+    struct Return : public std::variant<V, E> {
+        using std::variant<V, E>::variant;
+        operator bool() const { return std::holds_alternative<V>(Ego); }
+        const E& exception() const { return std::get<E>(Ego); }
+        const V& value() const { return std::get<V>(Ego); }
+        E moveException() { return std::get<E>(std::move(Ego)); }
+        V moveValue() { return std::get<V>(Ego); }
+        void throwIfException() {
+            if (!Ego) {
+                throw moveException();
+            }
+        }
+    };
+
+    template <typename R, typename F, typename... Args>
+    Return<R> TryCatch(F func, Args&&... args)
+    {
+        try {
+            return {func(std::forward<Args>(args)...)};
+        }
+        catch (...) {
+            return {Exception::fromCurrent()};
+        }
+    }
+
 }
 
 #endif //SUIL_BASE_EXCEPTION_HPP

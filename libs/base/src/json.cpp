@@ -1401,11 +1401,26 @@ namespace suil::json {
         o.ref = true;
     }
 
-    Object Object::operator[](int index) const {
-        if (mNode == nullptr || mNode->tag != Tag::JSON_ARRAY)
-            throw UnsupportedOperation("json::Object::[index] - object is not a JSON array");
-        Object obj(json_find_element(mNode, index));
-        return obj;
+    Object Object::operator[](int index) const
+    {
+        return Ego(index, true);
+    }
+
+    Object Object::operator()(int index, bool throwNotFound) const
+    {
+        if (mNode == nullptr || mNode->tag != Tag::JSON_ARRAY) {
+            if (throwNotFound) {
+                throw UnsupportedOperation("json::Object::[index] - object is not a JSON array");
+            }
+            return Object{nullptr};
+        }
+        else {
+            Object obj(json_find_element(mNode, index));
+            if (!obj and throwNotFound) {
+                throw IndexOutOfBounds("Index '", index, "' is out of  bounds");
+            }
+            return obj;
+        }
     }
 
     Object Object::operator()(const char *key, bool throwNotFound) const {
@@ -1559,7 +1574,7 @@ namespace suil::json {
         emit_value(ss, mNode);
     }
 
-    Object Object::decode(const char *str, size_t& sz) {
+    Object Object::decodeStr(const char *str, size_t& sz) {
         JsonNode *ret;
         const char *s = str;
         skip_space(&s);
