@@ -80,7 +80,7 @@ namespace suil::net::zmq {
             if (_id.empty()) {
                 _id = suil::randbytes(16);
                 Option::setIdentity(Ego, _id);
-                idebug("Created socket identity %s", _id());
+                itrace("Created socket identity %s", _id());
             }
         }
     }
