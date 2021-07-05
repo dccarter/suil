@@ -241,6 +241,7 @@ namespace suil::json {
         Object operator[](int index) const;
 
         Object operator()(const char *key, bool throwNotFound = false) const;
+        Object operator()(int index, bool throwNotFound = false) const;
 
         Object operator[](const char* key) const;
         Object operator[](const String& key) const;
@@ -260,12 +261,21 @@ namespace suil::json {
 
         operator double() const;
 
-        static Object decode(const char *str, size_t &sz);
+        static Object decodeStr(const char *str, size_t &sz);
+        static Object decode(const char *str, size_t &sz) {
+            return decodeStr(str, sz);
+        }
 
         template <typename T>
         static Object decode(const T& data) {
             size_t sz{data.size()};
-            return Object::decode(reinterpret_cast<const char *>(data.data()), sz);
+            return Object::decodeStr(reinterpret_cast<const char *>(data.data()), sz);
+        }
+
+        template <typename T>
+        static Return<Object> tryDecode(const T& data) {
+            size_t sz{data.size()};
+            return TryCatch<Object>(Object::decodeStr, reinterpret_cast<const char *>(data.data()), sz);
         }
 
         static Object fromLuaString(const String& script);

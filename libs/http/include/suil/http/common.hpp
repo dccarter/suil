@@ -11,6 +11,7 @@
 namespace suil::http {
 
     enum Status : int {
+        Unknown                     = 0,
         Continue			        = 100,
         SwitchingProtocols		    = 101,
         Ok				            = 200,
