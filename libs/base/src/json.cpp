@@ -1416,7 +1416,7 @@ namespace suil::json {
         }
         else {
             Object obj(json_find_element(mNode, index));
-            if (!obj and throwNotFound) {
+            if (obj.mNode == nullptr and throwNotFound) {
                 throw IndexOutOfBounds("Index '", index, "' is out of  bounds");
             }
             return obj;
@@ -2172,8 +2172,8 @@ TEST_CASE("suil::json::Object", "[json][Object]")
         WHEN("accessing array elements by index") {
             /* array JSON objects support the [int] operator*/
             json::Object arr(json::Arr, 1, true, "Cali", json::Object(json::Arr, 2, false, "Cali"));
-            REQUIRE(arr[-1].mNode == nullptr);
-            REQUIRE(arr[4].mNode == nullptr);
+            REQUIRE(arr(-1).mNode == nullptr);
+            REQUIRE(arr(4).mNode == nullptr);
 
             auto tmp = arr[0];
             REQUIRE_FALSE(tmp.mNode == nullptr);

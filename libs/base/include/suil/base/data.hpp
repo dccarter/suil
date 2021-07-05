@@ -109,7 +109,7 @@ namespace suil {
          * @return true if the two instances have the
          * same size and contents of the underlying buffers is similar
          */
-        inline bool operator==(const Data& other) {
+        inline bool operator==(const Data& other) const {
             if (Ego.m_size != other.m_size)
                    return false;
             return (Ego.m_size == 0) || memcmp(Ego.m_data, other.m_data, Ego.m_size) == 0;
