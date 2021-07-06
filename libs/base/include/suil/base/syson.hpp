@@ -6,7 +6,7 @@
 
 #include <suil/base/signal.hpp>
 
-#include <signal.h>
+#include <csignal>
 #include <mutex>
 
 namespace suil {

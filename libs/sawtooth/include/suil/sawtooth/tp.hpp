@@ -12,6 +12,8 @@
 
 #include <suil/net/zmq/monitor.hpp>
 
+#include <csignal>
+
 namespace suil::saw {
 
     define_log_tag(SAWSDK_TP);
