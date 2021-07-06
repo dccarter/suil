@@ -1,0 +1,25 @@
+// serializable data structures used in RPC
+#include <suil/base/string.hpp>
+
+// Load library used to generate the meta types
+#pragma load sbg
+
+namespace suil::saw::Client {
+
+    struct [[gen::sbg(meta)]] WalletEntry {
+#pragma native
+        WalletEntry() = default;
+        WalletEntry(String name, String key)
+            : Name{std::move(name)},
+              Key{std::move(key)}
+        {}
+#pragma endnative
+        String Name{""};
+        String Key{""};
+    };
+
+    struct [[gen::sbg(meta)]] WalletSchema {
+        String MasterKey;
+        std::vector<WalletEntry> Keys;
+    };
+}
