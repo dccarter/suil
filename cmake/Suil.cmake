@@ -33,6 +33,10 @@ if (NOT SUIL_INCLUDED)
         include(SuilUtils)
 
         # Find find all libraries required to create a Suil application/library
+        set(Protobuf_DEBUG ON)
+        set(Protobuf_USE_STATIC_LIBS ON)
+        find_package(Protobuf REQUIRED QUIET)
+
         find_package(OpenSSL REQUIRED)
         find_package(Threads REQUIRED)
         find_package(LuaS REQUIRED)
@@ -43,6 +47,8 @@ if (NOT SUIL_INCLUDED)
         find_package(Iod REQUIRED)
         find_package(Scc REQUIRED)
         find_package(Zmq REQUIRED)
+        find_package(Scc REQUIRED)
+        find_package(Secp256k1 REQUIRED)
         find_package(Suil)
 
         # Configure project version
