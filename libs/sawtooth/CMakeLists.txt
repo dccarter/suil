@@ -77,7 +77,7 @@ if (ENABLE_UNIT_TESTS)
     include_directories(test)
     include(SuilUnitTest)
     SuilUnitTest(Sawtooth-UnitTest
-            SOURCES ${SUIL_SAWTOOTH_SOURCES} test/main.cpp
+            SOURCES test/main.cpp
             LIBS    Suil::HttpClient)
     set_target_properties(Sawtooth-UnitTest
         PROPERTIES
