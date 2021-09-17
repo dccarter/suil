@@ -15,7 +15,7 @@ jobs:
     container: suilteam/base:alpine
     strategy:
       matrix:
-        type: [Debug, Release]
+        type: [Debug]
 
     steps:
       - uses: actions/checkout@v2

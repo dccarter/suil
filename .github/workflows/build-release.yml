@@ -4,6 +4,8 @@ on:
   release:
     types:
       - created
+env:
+  VERSION: 0.1.0
 
 jobs:
   build:
@@ -24,7 +26,7 @@ jobs:
         shell: bash
         run: |
           cd ${{runner.workspace}}/build-${{ matrix.type }}
-          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/artifacts/${{ matrix.type }}
+          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/artifacts/${{ matrix.type }} -DSUIL_VERSION=$VERSION
 
       # Build project dependencies
       - name: Build Dependecies
@@ -51,9 +53,31 @@ jobs:
           ./libs/http/httpserver_unittest -r junit -o httpserver_unittest.xml
           ./libs/http/httpclient_unittest -r junit -o httpclient_unittest.xml
 
-      - name: Cached Artifacts
-        uses: actions/upload-artifact@v2
+      - name: Create Release Artifact
+        shell: bash
+        run: |
+          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          make package
+
+      - name: Create Release
+        uses: zendesk/action-create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: unit-test-results
-          path: ${{runner.workspace}}/build-${{ matrix.type }}/*.xml
-          retention-days: 1
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ gitbub.ref }}
+          body: |
+            Changes in this Release
+            - Initial release
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          assert_path: ${{runner.workspace}}/build-${{ matrix.type }}/Suil-$VERSION-${{ matrix.type }}.tar.gz
+          assert_name: Suil-$VERSION-${{ matrix.type }}.tar.gz
+          asset_content_type: application/zip
