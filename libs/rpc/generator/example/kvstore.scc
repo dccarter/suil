@@ -16,5 +16,4 @@ namespace suil::rpc {
         /// rpc method returning a string
         suil::String get(const String& name);
     };
-
 }

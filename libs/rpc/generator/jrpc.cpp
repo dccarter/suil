@@ -27,29 +27,28 @@ namespace suil::rpc {
             throw scc::Exception("suil/rpc/json generator does not support base classes on services");
         }
 
-        generateClient(fmt, klass);
+        UsingNamespace(getNamespace(), fmt);
+        {
+            generateClient(fmt, klass);
 
-        fmt() << "class ";
-        ct.Name.toString(fmt);
-        fmt(true) << ";";
+            Line(fmt) << "class " << ct.Name<< ";";
 
-        generateServer(fmt, klass);
+            generateServer(fmt, klass);
+        }
     }
 
     void JsonRpcHppGenerator::generateClient(scc::Formatter& fmt, const scc::Class& ct)
     {
-        fmt() << "class ";
+        Line(fmt) << "class ";
         scc::Attribute::toString(fmt, ct.Attribs);
-        fmt(true) << ' ';
-        ct.Name.toString(fmt);
-        fmt(true) << "JrpcClient : ";
+        fmt << ' ' << ct.Name << "JrpcClient : ";
         // implement Jrpc::Client
-        fmt(true) << "public suil::rpc::jrpc::Client {";
-        fmt() << "public:";
-        fmt.push();
+        fmt << "public suil::rpc::jrpc::Client {";
+        Line(fmt) << "public:";
+        Line(++fmt);
         // use constructor from jrpc::Client
-        fmt() << "using jrpc::Client::Client;";
-        fmt();
+        Line(fmt) << "using jrpc::Client::Client;";
+        Line(fmt);
         bool isPublic{false};
         scc::Visitor<scc::Class>(ct).visit<scc::Node>([&](const scc::Node& tp) {
             if (tp.is<scc::Native>() and !tp.as<scc::Native>().ForCpp) {
@@ -70,8 +69,8 @@ namespace suil::rpc {
             }
         });
 
-        fmt.pop() << "};";
-        fmt();
+        Line(--fmt)<< "};";
+        Line(fmt);
     }
 
     void JsonRpcHppGenerator::generateClientMethod(
@@ -106,28 +105,22 @@ namespace suil::rpc {
 
     void JsonRpcHppGenerator::generateServer(scc::Formatter& fmt, const scc::Class& ct)
     {
-        fmt() << "class ";
+        Line(fmt) << "class ";
         scc::Attribute::toString(fmt, ct.Attribs);
-        fmt(true) << ' ';
-        ct.Name.toString(fmt);
-        fmt(true) << "JrpcContext : ";
+        fmt << ' ' << ct.Name << "JrpcContext : ";
         // implement jrpc::Context
-        fmt(true) << "public suil::rpc::jrpc::Context {";
-        fmt() << "public:";
-        fmt.push();
+        fmt << "public suil::rpc::jrpc::Context {";
+        Line(fmt) << "public:";
+        Line(++fmt);
         // Create constructor
-        fmt() << "template <typename ...Args>";
-        ct.Name.toString(fmt);
-        fmt(true) << "JrpcContext(std::shared_ptr<";
-        ct.Name.toString(fmt);
-        fmt(true) << "> service, Args&&... args)";
-        fmt.push() << ": jrpc::Context::Context(std::forward<Args>(args)...)";
-        fmt() << ", m";
-        ct.Name.toString(fmt);
-        fmt(true) << "{std::move(service)}";
-        fmt.pop() << "{}";
+        Line(fmt) << "template <typename ...Args>" << ct.Name
+                  << "JrpcContext(std::shared_ptr<"
+                  << ct.Name << "> service, Args&&... args)";
+        Line(++fmt) << ": jrpc::Context::Context(std::forward<Args>(args)...)";
+        Line(fmt) << ", m" << ct.Name << "{std::move(service)}";
+        Line(--fmt) << "{}";
 
-        fmt();
+        Line(fmt);
         bool isPublic{false};
         scc::Visitor<scc::Class>(ct).visit<scc::Node>([&](const scc::Node& tp) {
             if (tp.is<scc::Native>() and !tp.as<scc::Native>().ForCpp) {
@@ -147,24 +140,19 @@ namespace suil::rpc {
             }
 
             if (tp.is<scc::Field>()) {
-                fmt(true) << ';';
+                fmt << ';';
             }
         });
-        fmt.pop() << "protected:";
+        Line(--fmt) << "protected:";
         // add function that will be used to handle incoming messages
-        fmt.push() << "suil::rpc::jrpc::ResultCode operator()("
+        Line(++fmt) << "suil::rpc::jrpc::ResultCode operator()("
                       "const suil::String& method, const suil::json::Object& params, int id) override;";
-        fmt.pop();
+        --fmt;
 
-        fmt.pop() << "private:";
-        fmt.push() << "std::shared_ptr<";
-        ct.Name.toString(fmt);
-        fmt(true) << "> m";
-        ct.Name.toString(fmt);
-        fmt(true) << "{nullptr};";
-
-        fmt.pop() << "};";
-        fmt();
+        Line(--fmt) << "private:";
+        Line(++fmt) << "std::shared_ptr<" << ct.Name << "> m" << ct.Name << "{nullptr};";
+        Line(--fmt) << "};";
+        Line(fmt);
     }
 
     void JsonRpcHppGenerator::generateServerMethod(scc::Formatter& fmt, const scc::Method& method, bool isPublic)
@@ -179,9 +167,9 @@ namespace suil::rpc {
             return;
         }
 
-        fmt() << "///!";
+        Line(fmt) << "///!";
         method.toString0(fmt);
-        fmt(true) << ";";
+        fmt << ";";
     }
 
     void JsonRpcCppGenerator::generate(scc::Formatter fmt, const scc::Type& ct)
@@ -190,8 +178,11 @@ namespace suil::rpc {
             throw scc::Exception("suil/rpc/json generator can only be used on class types");
         }
         const auto& klass = ct.as<scc::Class>();
-        generateClient(fmt, klass);
-        generateServer(fmt, klass);
+        UsingNamespace(getNamespace(), fmt);
+        {
+            generateClient(fmt, klass);
+            generateServer(fmt, klass);
+        }
     }
 
     void JsonRpcCppGenerator::generateClient(scc::Formatter& fmt, const scc::Class& ct)
@@ -213,118 +204,101 @@ namespace suil::rpc {
     void JsonRpcCppGenerator::generateClientMethod(
             scc::Formatter& fmt, const std::string& klass, const scc::Method& method)
     {
-        fmt();
+        Line(fmt);
         method.ReturnType.toString(fmt);
-        fmt(true) << ' ' << klass << "JrpcClient::";
-        method.Name.toString(fmt);
+        fmt << ' ' << klass << "JrpcClient::" << method.Name;
         method.signature(fmt);
-        fmt(true) << " {";
-        fmt.push() << R"(auto res = Ego.call(")";
-        method.Name.toString(fmt);
-        fmt(true) << '"';
+        fmt << " {";
+        Line(++fmt) << R"(auto res = Ego.call(")"
+                    << method.Name << '"';
         for (auto& param: method.Params) {
-            fmt(true) << ", \"";
+            fmt << ", \"";
             param.Name.toString(fmt);
-            fmt(true) << "\", ";
+            fmt << "\", ";
             param.Name.toString(fmt);
         }
-        fmt(true) << ");";
-        fmt() << "if (res.has<suil::String>()) {";
-        fmt.push() << "auto& err = std::get<suil::String>(res.Value);";
-        fmt()      << "throw suil::rpc::RpcApiError(err);";
-        fmt.pop() << "}";
+        fmt << ");";
+        Line(fmt) << "if (res.has<suil::String>()) {";
+        Line(++fmt) << "auto& err = std::get<suil::String>(res.Value);";
+        Line(fmt)      << "throw suil::rpc::RpcApiError(err);";
+        Line(--fmt)<< "}";
         if (!method.ReturnType.Type.isVoid()) {
-            fmt() << "auto& obj = std::get<suil::json::Object>(res.Value);";
-            method.ReturnType.toString(fmt);
-            fmt(true) << " tmp;";
-            fmt() << "obj.copyOut(tmp, obj);";
-            fmt() << "return std::move(tmp);";
+            Line(fmt) << "auto& obj = std::get<suil::json::Object>(res.Value);"
+                      << method.ReturnType.Type << " tmp;";
+            Line(fmt) << "obj.copyOut(tmp, obj);";
+            Line(fmt) << "return std::move(tmp);";
         }
-        fmt.pop() << "}";
-        fmt();
+        Line(--fmt)<< "}";
+        Line(fmt);
     }
 
     void JsonRpcCppGenerator::generateServer(scc::Formatter& fmt, const scc::Class& ct)
     {
-        fmt() << "suil::rpc::jrpc::ResultCode ";
-        ct.Name.toString(fmt);
-        fmt(true) << "JrpcContext::operator()(";
-        fmt(true) << "const suil::String& method, const suil::json::Object& params, int id) {";
-        fmt.push() << "static suil::UnorderedMap<int> scMappings = {";
-        fmt.push(false);
+        Line(fmt) << "suil::rpc::jrpc::ResultCode " << ct.Name
+                  << "JrpcContext::operator()("
+                  << "const suil::String& method, const suil::json::Object& params, int id) {";
+        Line(++fmt) << "static suil::UnorderedMap<int> scMappings = {";
+        ++fmt;
 
         auto rpcMethods = getRpcMethods(ct, "json");
         int index{0};
         for (const scc::Method& method: rpcMethods) {
             if (index != 0) {
-                fmt(true) << ",";
+                fmt << ",";
             }
-            fmt() << R"({")";
-            method.Name.toString(fmt);
-            fmt(true) << R"(", )" << index++ << "}";
+            Line(fmt) << R"({")" << method.Name << R"(", )" << index++ << "}";
         }
-        fmt.pop() << "};";
-        fmt();
-        fmt() << "if (m";
-        ct.Name.toString(fmt);
-        fmt(true) << " == nullptr) {";
-        fmt.push() << "return {suil::rpc::jrpc::ResultCode::InternalError,"
+        Line(--fmt)<< "};";
+        Line(fmt);
+        Line(fmt) << "if (m" << ct.Name << " == nullptr) {";
+        Line(++fmt) << "return {suil::rpc::jrpc::ResultCode::InternalError,"
                       "suil::String{\"Service currently unavailbale\"}};";
-        fmt.pop() << "}";
-        fmt();
+        Line(--fmt)<< "}";
+        Line(fmt);
 
-        fmt() << "auto it = scMappings.find(method);";
-        fmt() << "if (it == scMappings.end()) {";
-        fmt.push() << "return {suil::rpc::jrpc::ResultCode::MethodNotFound,"
+        Line(fmt) << "auto it = scMappings.find(method);";
+        Line(fmt) << "if (it == scMappings.end()) {";
+        Line(++fmt) << "return {suil::rpc::jrpc::ResultCode::MethodNotFound,"
                                "suil::String{\"request method not implemented\"}};";
-        fmt.pop() << "}";
-        fmt();
-        fmt() << "switch(it->second) {";
-        fmt.push(false);
+        Line(--fmt)<< "}";
+        Line(fmt);
+        Line(fmt) << "switch(it->second) {";
+        ++fmt;
         index = 0;
         for (const scc::Method& method: rpcMethods) {
-            fmt() << "case " << index++ << ": {";
-            fmt.push(false);
+            Line(fmt) << "case " << index++ << ": {";
+            ++fmt;
             for (auto& param: method.Params) {
-
-                fmt() << "auto ";
-                param.Name.toString(fmt);
-                fmt(true) << " = (";
-                param.Type.toString(fmt);
-                fmt(true) << ") params[\"";
-                param.Name.toString(fmt);
-                fmt(true) << "\"];";
+                Line(fmt) << "auto " << param.Name << " = ("
+                          << param.Type << ") params[\""
+                          << param.Name
+                          << "\"];";
             }
             // invoke the method
-            fmt();
+            Line(fmt);
             if (!method.ReturnType.Type.isVoid()) {
-                fmt() << "json::Object obj{Ego.m";
-                ct.Name.toString(fmt);
-                fmt(true) << "->";
-                method.Name.toString(fmt);
-                fmt(true) << '(';
+                Line(fmt) << "json::Object obj{Ego.m" << ct.Name
+                          << "->" << method.Name << '(';
                 writeParameterCall(fmt, method);
-                fmt(true) << ")};";
-                fmt() << "return {0, jrpc::Result{std::move(obj)}};";
+                fmt << ")};";
+                Line(fmt) << "return {0, jrpc::Result{std::move(obj)}};";
             }
             else {
-                fmt() << "Ego.m";
-                ct.Name.toString(fmt);
-                fmt(true) << "->";
-                method.Name.toString(fmt);
-                fmt(true) << '(';
+                Line(fmt) << "Ego.m" << ct.Name
+                          << "->"
+                          << method.Name << '(';
                 writeParameterCall(fmt, method);
-                fmt(true) << ");";
-                fmt() << "return {0, jrpc::Result{suil::json::Object(nullptr)}};";
+                fmt << ");";
+                Line(fmt) << "return {0, jrpc::Result{suil::json::Object(nullptr)}};";
             }
-            fmt.pop() << "}";
+            Line(--fmt)<< "}";
         }
-        fmt() << "default: {";
-        fmt.push() << "return {suil::rpc::jrpc::ResultCode::MethodNotFound, "
+        Line(fmt) << "default: {";
+        Line(++fmt) << "return {suil::rpc::jrpc::ResultCode::MethodNotFound, "
                         "suil::String(\"requested method does not exist\")};";
-        fmt.pop() << "}";   // close default case
-        fmt.pop() << "}";   // close switch
-        fmt.pop() << "}";   // close method
-        fmt();
+        Line(--fmt)<< "}";   // close default case
+        Line(--fmt)<< "}";   // close switch
+        Line(--fmt)<< "}";   // close method
+        Line(fmt);
     };
 }

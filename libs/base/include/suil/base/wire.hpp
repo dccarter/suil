@@ -98,26 +98,37 @@ namespace suil {
         }
 
         template <typename T>
-        Wire& operator<<(const T val) {
-            if constexpr (std::is_arithmetic<T>::value) {
-                uint64_t tmp{0};
-                memcpy(&tmp, &val, sizeof(T));
-                tmp = htole64((uint64_t) tmp);
-                forward((uint8_t *) &tmp, sizeof(val));
-                return Ego;
-            }
-            else {
-                val.toWire(Ego);
-                return Ego;
-            }
+            requires std::is_arithmetic_v<T>
+        Wire& operator<<(const T& val) {
+            uint64_t tmp{0};
+            memcpy(&tmp, &val, sizeof(T));
+            tmp = htole64((uint64_t) tmp);
+            forward((uint8_t *) &tmp, sizeof(val));
+            return Ego;
         }
 
         template <typename T>
-        Wire& operator<<(const iod::Nullable<T>& val) {
-            Ego << val.has_value();
-            if (val.has_value()) {
-                return (Ego << val.value());
-            }
+        requires std::is_arithmetic_v<T>
+        inline Wire& operator>>(T& val) {
+            uint64_t tmp{0};
+            reverse((uint8_t *) &tmp, sizeof(val));
+            tmp = le64toh(tmp);
+            memcpy(&val, &tmp, sizeof(T));
+            return Ego;
+        };
+
+        template <typename T>
+            requires (std::is_enum_v<T> and std::is_integral_v<std::underlying_type_t<T>>)
+        Wire& operator<<(const T& val) {
+            return (Ego << std::underlying_type_t<T>(val));
+        }
+
+        template <typename T>
+            requires (std::is_enum_v<T> and std::is_integral_v<std::underlying_type_t<T>>)
+        Wire& operator>>(T& val) {
+            std::underlying_type_t<T> tmp;
+            Ego >> tmp;
+            val = (T) tmp;
             return Ego;
         }
 
@@ -128,15 +139,29 @@ namespace suil {
         }
 
         template <typename T>
-            requires std::is_base_of_v<iod::MetaType, T>
+            requires (std::is_base_of_v<iod::MetaType, T> || std::is_base_of_v<iod::UnionType, T>)
         static size_t maxByteSize(const T& val) {
             return val.maxByteSize();
         }
 
         template <typename T>
-            requires std::is_base_of_v<iod::UnionType, T>
+            requires (std::is_base_of_v<iod::MetaType, T> || std::is_base_of_v<iod::UnionType, T>)
+        Wire& operator>>(T& val) {
+            val = T::fromWire(Ego);
+            return Ego;
+        }
+
+        template <typename T>
+            requires (std::is_base_of_v<iod::MetaType, T> || std::is_base_of_v<iod::UnionType, T>)
+        Wire& operator<<(const T& val) {
+            val.toWire(Ego);
+            return Ego;
+        }
+
+        template <typename T>
+            requires (std::is_enum_v<T> and std::is_integral_v<std::underlying_type_t<T>>)
         static size_t maxByteSize(const T& val) {
-            return val.maxByteSize();
+            return maxByteSize(std::underlying_type_t<T>(val));
         }
 
         template <typename T>
@@ -148,19 +173,13 @@ namespace suil {
         }
 
         template <typename T>
-        inline Wire& operator>>(T& val) {
-            if constexpr (std::is_arithmetic<T>::value) {
-                uint64_t tmp{0};
-                reverse((uint8_t *) &tmp, sizeof(val));
-                tmp = le64toh(tmp);
-                memcpy(&val, &tmp, sizeof(T));
-                return Ego;
+        Wire& operator<<(const iod::Nullable<T>& val) {
+            Ego << val.has_value();
+            if (val.has_value()) {
+                return (Ego << val.value());
             }
-            else {
-                val = T::fromWire(Ego);
-                return Ego;
-            }
-        };
+            return Ego;
+        }
 
         template <typename T>
         inline Wire& operator>>(iod::Nullable<T>& val) {

@@ -18,6 +18,7 @@ namespace suil {
         Wire = 0x02,
         Meta = 0x03 // Both Json and Wire
     };
+
     class HppSuilMetaGenerator: public scc::HppGenerator {
     public:
         HppSuilMetaGenerator(Kind kind = Kind::Meta);
@@ -25,6 +26,9 @@ namespace suil {
         void includes(scc::Formatter fmt, scc::IncludeBag &incs) override;
     private:
         void generateUnion(scc::Formatter& fmt, const scc::Struct& st);
+        void generateUnionV1(scc::Formatter& fmt, const scc::Struct& st);
+        void generateUnionV2(scc::Formatter& fmt, const scc::Struct& st);
+        void generateEnum(scc::Formatter& fmt, const scc::Enum& e);
         void generateUnionVariant(scc::Formatter& fmt, const scc::Struct& st);
         void generateStruct(scc::Formatter& fmt, const scc::Struct& st);
         bool is(Kind kind) { return (kind & mKind) == kind; }
@@ -38,6 +42,9 @@ namespace suil {
 
     private:
         void generateUnion(scc::Formatter& fmt, const scc::Struct& st);
+        void generateUnionV1(scc::Formatter& fmt, const scc::Struct& st);
+        void generateUnionV2(scc::Formatter& fmt, const scc::Struct& st);
+        void generateEnum(scc::Formatter& fmt, const scc::Enum& st);
         void generateStruct(scc::Formatter& fmt, const scc::Struct& st);
         bool is(Kind kind) { return (kind & mKind) == kind; }
         Kind mKind;

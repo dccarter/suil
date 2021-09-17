@@ -14,6 +14,8 @@ int main(int argc, char* argv[])
 {
     suil::StackBoard<2048> sb;
     suil::Command cmd(suil::Create("Carter", "Deposit"));
+    get<suil::Create>(cmd.Value).Category = suil::Categories::Sports;
+
     sb << cmd;
     suil::Command cmd2;
     sb >> cmd2;
@@ -28,7 +30,7 @@ int main(int argc, char* argv[])
     }, cmd2.Value);
 
     auto str = suil::json::encode(cmd2);
-    std::cout << str;
+    std::cout << str << std::endl;
     suil::Command cmd3;
     suil::json::decode(str, cmd3);
     std::visit([&](const auto& arg) {
@@ -46,5 +48,8 @@ int main(int argc, char* argv[])
     str = suil::json::encode(jo);
     jo.other = jo.obj.weak();
     str = suil::json::encode(jo);
+
+    suil::Categories category{suil::Categories::Sports};
+    std::cout << category << std::endl;
     return 0;
 }

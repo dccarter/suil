@@ -5,6 +5,7 @@
 #include "suil/base/data.hpp"
 
 #include "suil/base/base64.hpp"
+#include "suil/base/exception.hpp"
 #include "suil/base/string.hpp"
 #include "suil/base/buffer.hpp"
 
@@ -114,6 +115,26 @@ namespace suil {
             size = ob.size();
             return Data{ob.release(), size, true};
         }
+    }
+
+    uint8* Data::release() {
+        auto tmp = m_data;
+        m_own = false;
+        m_data = nullptr;
+        m_size = 0;
+        return tmp;
+    }
+
+    Data Data::release(size_t resize) {
+        if (resize >= m_size) {
+            throw AccessViolation("requested resize is greater than the buffer size");
+        }
+        resize = (resize == 0)? m_size : resize;
+        auto tmp = Data{m_data, resize, m_own};
+        m_data = nullptr;
+        m_own = false;
+        m_size = false;
+        return tmp;
     }
 }
 
