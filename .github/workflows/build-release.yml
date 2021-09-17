@@ -1,9 +1,9 @@
 name: Development Build
 
 on:
-  release:
-    types:
-      - created
+  push:
+    tags:
+      - v*
 env:
   VERSION: 0.1.0
 
