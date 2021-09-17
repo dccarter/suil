@@ -27,24 +27,25 @@ namespace suil::rpc {
             throw scc::Exception("suil/rpc/wire generator does not support base classes on services");
         }
 
-        generateClient(fmt, klass);
-        generateServer(fmt, klass);
+        UsingNamespace(getNamespace(), fmt);
+        {
+            generateClient(fmt, klass);
+            generateServer(fmt, klass);
+        }
     }
 
     void SuilRpcHppGenerator::generateClient(scc::Formatter& fmt, const scc::Class& ct)
     {
-        fmt() << "class ";
+        Line(fmt) << "class ";
         scc::Attribute::toString(fmt, ct.Attribs);
-        fmt(true) << ' ';
-        ct.Name.toString(fmt);
-        fmt(true) << "SrpcClient : ";
+        fmt << ' ' << ct.Name << "SrpcClient : ";
         // implement srpc::Client
-        fmt(true) << "public suil::rpc::srpc::Client {";
-        fmt() << "public:";
-        fmt.push();
+        fmt << "public suil::rpc::srpc::Client {";
+        Line(fmt) << "public:";
+        Line(++fmt);
         // use constructor from jrpc::Client
-        fmt() << "using srpc::Client::Client;";
-        fmt();
+        Line(fmt) << "using srpc::Client::Client;";
+        Line(fmt);
         bool isPublic{false};
         scc::Visitor<scc::Class>(ct).visit<scc::Node>([&](const scc::Node& tp) {
             if (tp.is<scc::Native>() and !tp.as<scc::Native>().ForCpp) {
@@ -65,9 +66,8 @@ namespace suil::rpc {
             }
         });
 
-        fmt.pop();
-        fmt() << "};";
-        fmt();
+        Line(--fmt) << "};";
+        Line(fmt);
     }
 
     void SuilRpcHppGenerator::generateClientMethod(
@@ -102,29 +102,22 @@ namespace suil::rpc {
 
     void SuilRpcHppGenerator::generateServer(scc::Formatter& fmt, const scc::Class& ct)
     {
-        fmt() << "class ";
+        Line(fmt) << "class ";
         scc::Attribute::toString(fmt, ct.Attribs);
-        fmt(true) << ' ';
-        ct.Name.toString(fmt);
-        fmt(true) << "SrpcContext : ";
+        fmt << ' ' << ct.Name << "SrpcContext : ";
         // implement srpc::Context
-        fmt(true) << "public suil::rpc::srpc::Context {";
-        fmt() << "public:";
-        fmt.push();
+        fmt << "public suil::rpc::srpc::Context {";
+        Line(fmt) << "public:";
+        Line(++fmt);
         // Create constructor
-        fmt() << "template <typename ...Args>";
-        fmt();
-        ct.Name.toString(fmt);
-        fmt(true) << "SrpcContext(std::shared_ptr<";
-        ct.Name.toString(fmt);
-        fmt(true) << "> service, Args&&... args)";
-        fmt.push() << ": srpc::Context::Context(std::forward<Args>(args)...)";
-        fmt() << ", m";
-        ct.Name.toString(fmt);
-        fmt(true) << "{std::move(service)}";
-        fmt.pop() << "{}";
+        Line(fmt) << "template <typename ...Args>";
+        Line(fmt) << ct.Name << "SrpcContext(std::shared_ptr<"
+                  << ct.Name << "> service, Args&&... args)";
+        Line(++fmt) << ": srpc::Context::Context(std::forward<Args>(args)...)";
+        Line(fmt) << ", m" << ct.Name << "{std::move(service)}";
+        Line(--fmt) << "{}";
 
-        fmt();
+        Line(fmt);
         bool isPublic{false};
         scc::Visitor<scc::Class>(ct).visit<scc::Node>([&](const scc::Node& tp) {
             if (tp.is<scc::Native>() and !tp.as<scc::Native>().ForCpp) {
@@ -144,26 +137,21 @@ namespace suil::rpc {
             }
 
             if (tp.is<scc::Field>()) {
-                fmt(true) << ';';
+                fmt << ';';
             }
         });
 
-        fmt.pop() << "protected:";
+        Line(--fmt) << "protected:";
         // add function that will be used to handle incoming messages
-        fmt.push() << "void operator()("
+        Line(++fmt) << "void operator()("
                       "suil::HeapBoard& resp, suil::HeapBoard& req, int id, int method) override;";
-        fmt()      << "void buildMethodInfo() override;";
-        fmt.pop();
+        Line(fmt)      << "void buildMethodInfo() override;";
+        --fmt;
 
-        fmt.pop() << "private:";
-        fmt.push() << "std::shared_ptr<";
-        ct.Name.toString(fmt);
-        fmt(true) << "> m";
-        ct.Name.toString(fmt);
-        fmt(true) << "{nullptr};";
-
-        fmt.pop() << "};";
-        fmt();
+        Line(--fmt) << "private:";
+        Line(++fmt) << "std::shared_ptr<" << ct.Name << "> m" << ct.Name << "{nullptr};";
+        Line(--fmt)<< "};";
+        Line(fmt);
     }
 
     void SuilRpcHppGenerator::generateServerMethod(scc::Formatter& fmt, const scc::Method& method, bool isPublic)
@@ -178,9 +166,9 @@ namespace suil::rpc {
             return;
         }
 
-        fmt() << "///!";
+        Line(fmt) << "///!";
         method.toString0(fmt);
-        fmt(true) << ";";
+        fmt << ";";
     }
 
     void SuilRpcCppGenerator::generate(scc::Formatter fmt, const scc::Type& ct)
@@ -189,8 +177,11 @@ namespace suil::rpc {
             throw scc::Exception("suil/rpc/wire generator can only be used on class types");
         }
         const auto& klass = ct.as<scc::Class>();
-        generateClient(fmt, klass);
-        generateServer(fmt, klass);
+        UsingNamespace(getNamespace(), fmt);
+        {
+            generateClient(fmt, klass);
+            generateServer(fmt, klass);
+        }
     }
 
     void SuilRpcCppGenerator::generateClient(scc::Formatter& fmt, const scc::Class& ct)
@@ -212,103 +203,80 @@ namespace suil::rpc {
     void SuilRpcCppGenerator::generateClientMethod(
             scc::Formatter& fmt, const std::string& klass, const scc::Method& method)
     {
-        fmt();
+        Line(fmt);
         method.ReturnType.toString(fmt);
-        fmt(true) << ' ' << klass << "SrpcClient::";
-        method.Name.toString(fmt);
+        fmt << ' ' << klass << "SrpcClient::" << method.Name;
         method.signature(fmt);
-        fmt(true) << " {";
-        fmt.push();
+        fmt << " {";
+        Line(++fmt);
         if (!method.ReturnType.Type.isVoid()) {
-            fmt(true) << "return ";
+            fmt << "return ";
         }
-        fmt() << "Ego.call<";
-        method.ReturnType.Type.toString(fmt);
-        fmt(true) << ">(\"";
-        method.Name.toString(fmt);
-        fmt(true) << '"';
+        Line(fmt) << "Ego.call<" << method.ReturnType.Type << ">(\""
+                  << method.Name << '"';
         for (auto& param: method.Params) {
-            fmt(true) << ", ";
-            param.Name.toString(fmt);
+            fmt << ", " << param.Name;
         }
-        fmt(true) << ");";
-        fmt.pop() << "}";
-        fmt();
+        fmt << ");";
+        Line(--fmt)<< "}";
+        Line(fmt);
     }
 
     void SuilRpcCppGenerator::generateServer(scc::Formatter& fmt, const scc::Class& ct)
     {
         auto rpcMethods = getRpcMethods(ct, "json");
-        fmt() << "void ";
-        ct.Name.toString(fmt);
-        fmt(true) << "SrpcContext::buildMethodInfo() {";
-        fmt.push(false);
+        Line(fmt) << "void " << ct.Name << "SrpcContext::buildMethodInfo() {";
+        ++fmt;
         for (const scc::Method& method: rpcMethods) {
-            fmt() << "Ego.appendMethod(\"";
-            method.Name.toString(fmt);
-            fmt(true) << "\");";
+            Line(fmt) << "Ego.appendMethod(\"" << method.Name << "\");";
         }
-        fmt.pop() << "}";
-        fmt();
+        Line(--fmt)<< "}";
+        Line(fmt);
 
-        fmt() << "void ";
-        ct.Name.toString(fmt);
-        fmt(true) << "SrpcContext::operator()(suil::HeapBoard& resp, suil::HeapBoard& req, int id, int method)";
-        fmt(true) << " {";
-        fmt.push(false);
+        Line(fmt) << "void " << ct.Name
+                  << "SrpcContext::operator()(suil::HeapBoard& resp, suil::HeapBoard& req, int id, int method)"
+                  << " {";
+        ++fmt;
 
-        fmt() << "switch(method) {";
-        fmt.push(false);
+        Line(fmt) << "switch(method) {";
+        ++fmt;
         int index = 1;
         for (const scc::Method& method: rpcMethods) {
-            fmt() << "case " << index++ << ": {";
-            fmt.push(false);
+            Line(fmt) << "case " << index++ << ": {";
+            ++fmt;
             for (auto& param: method.Params) {
 
-                fmt();
-                param.Type.toString(fmt);
-                fmt(true) << " ";
-                param.Name.toString(fmt);
-                fmt(true) << ";";
-                fmt() << "req >> ";
-                param.Name.toString(fmt);
-                fmt(true) << ";";
+                Line(fmt) << param.Type << " " << param.Name << ";";
+                Line(fmt) << "req >> " << param.Name << ";";
             }
 
             // invoke the method
-            fmt();
+            Line(fmt);
             if (!method.ReturnType.Type.isVoid()) {
-                fmt() << "auto res = Ego.m";
-                ct.Name.toString(fmt);
-                fmt(true) << "->";
-                method.Name.toString(fmt);
-                fmt(true) << '(';
+                Line(fmt) << "auto res = Ego.m" << ct.Name << "->"
+                          << method.Name << '(';
                 writeParameterCall(fmt, method);
-                fmt(true) << ");";
-                fmt() << "resp = suil::HeapBoard{payloadSize(res)};";
-                fmt() << "resp << id << 0 << res;";
+                fmt << ");";
+                Line(fmt) << "resp = suil::HeapBoard{payloadSize(res)};";
+                Line(fmt) << "resp << id << 0 << res;";
             }
             else {
-                fmt() << "Ego.m";
-                ct.Name.toString(fmt);
-                fmt(true) << "->";
-                method.Name.toString(fmt);
-                fmt(true) << '(';
+                Line(fmt) << "Ego.m" << ct.Name << "->" << method.Name << '(';
                 writeParameterCall(fmt, method);
-                fmt(true) << ");";
-                fmt() << "resp = suil::HeapBoard{payloadSize(0)};";
-                fmt() << "resp << id << 0;";
+                fmt << ");";
+                Line(fmt) << "resp = suil::HeapBoard{payloadSize(0)};";
+                Line(fmt) << "resp << id << 0;";
             }
-            fmt() << "break;";
-            fmt.pop() << "}";
+            Line(fmt) << "break;";
+            Line(--fmt)<< "}";
         }
-        fmt() << "default: {";
-        fmt.push() << R"(RpcError err{-1, "MethodNotFound", "requested method does not exist"};)";
-        fmt() << "resp = suil::HeapBoard(payloadSize(err));";
-        fmt() << "resp << id << -1 << err;";
-        fmt.pop() << "}";   // close default case
-        fmt.pop() << "}";   // close switch
-        fmt.pop() << "}";   // close method
-        fmt();
+        Line(fmt) << "default: {";
+        Line(++fmt) << R"(RpcError err{-1, "MethodNotFound", "requested method does not exist"};)";
+        Line(fmt) << "resp = suil::HeapBoard(payloadSize(err));";
+        Line(fmt) << "resp << id << -1 << err;";
+        Line(--fmt)<< "}";   // close default case
+        Line(--fmt)<< "}";   // close switch
+        Line(--fmt)<< "}";   // close method
+        Line(fmt);
     };
 };

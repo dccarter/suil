@@ -9,30 +9,40 @@
 #pragma load sbg
 
 namespace suil {
+    enum [[gen::sbg(meta)]] [[sbg::enum(encname)]] Categories {
+        Sports = 0,
+        Household = 99,
+        Groceries
+    };
+
     struct [[gen::sbg(meta)]] Deposit {
 #pragma native
         Deposit(std::string id, int amount)
             : AccountId{std::move(id)},
-              Amount{amount}
+              Amount{amount},
+              Category{Categories::Household}
         {}
         Deposit() = default;
 #pragma endnative
 
         std::string AccountId;
         int         Amount;
+        Categories  Category;
     };
 
     struct [[gen::sbg(meta)]] Create {
 #pragma native
         Create(std::string owner, std::string name)
         : Owner{std::move(owner)},
-          AccountName{std::move(name)}
+          AccountName{std::move(name)},
+          Category{Categories::Household}
         {}
         Create() = default;
 #pragma endnative
 
         std::string Owner;
         std::string AccountName;
+        Categories  Category;
     };
 
     struct [[gen::sbg(meta)]] Withdraw {

@@ -66,6 +66,7 @@ if (NOT SUIL_INCLUDED)
 
         if (SUIL_PROJECT_SCC_SOURCES)
             set(SUIL_PROJECT_SCC_PUB  ${SUIL_PROJECT_SCC_OUTDIR}/public)
+            include_directories(${SUIL_PROJECT_SCC_PUB})
             if (SUIL_PROJECT_SCC_SUFFIX)
                 set(SUIL_PROJECT_SCC_PUB ${SUIL_PROJECT_SCC_PUB}/${SUIL_PROJECT_SCC_SUFFIX})
             endif()
@@ -78,6 +79,7 @@ if (NOT SUIL_INCLUDED)
         if (SUIL_PROJECT_PRIV_SCC_SOURCES)
             set(SUIL_PROJECT_SCC_PRIV ${SUIL_PROJECT_SCC_OUTDIR}/private)
             message(STATUS ${SUIL_PROJECT_SCC_PRIV})
+            include_directories(${SUIL_PROJECT_SCC_PRIV})
             SuilScc(${name}
                     PROJECT  ON
                     PRIVATE  ON
@@ -203,8 +205,7 @@ if (NOT SUIL_INCLUDED)
                 LIB_PATH     ${SUIL_SCC_PLUGINS_DIR}
                 OUTDIR       ${SUIL_${_name}_SCC_PUB})
             target_include_directories(${name}
-                    PRIVATE ${SUIL_${_name}_SCC_PUB}
-                            ${SUIL_${_name}_SCC_PRIV})
+                    PRIVATE ${SUIL_${_name}_SCC_PUB})
         endif()
 
         if (SUIL_TARGET_SCC_PRIV_SOURCES)
@@ -213,6 +214,8 @@ if (NOT SUIL_INCLUDED)
                 SOURCES      ${SUIL_TARGET_PRIV_SCC_SOURCES}
                 LIB_PATH     ${SUIL_SCC_PLUGINS_DIR}
                 OUTDIR       ${SUIL_${_name}_SCC_PRIV})
+            target_include_directories(${name}
+                    PRIVATE ${SUIL_${_name}_SCC_PRIV})
         endif()
 
         if (SUIL_TARGET_TEST)

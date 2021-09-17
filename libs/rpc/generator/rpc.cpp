@@ -38,17 +38,17 @@ namespace suil::rpc {
     {
         for (auto& param: method.Params) {
             if (&param != &method.Params.front()) {
-                fmt(true) << ", ";
+                fmt << ", ";
             }
 
             if (param.Kind.empty() or param.Kind == "&&") {
-                fmt(true) << "std::move(";
+                fmt << "std::move(";
                 param.Name.toString(fmt);
-                fmt(true) << ')';
+                fmt << ')';
             }
             else if (param.Kind == "*") {
                 // this really shouldn't be supported
-                fmt(true) << "&";
+                fmt << "&";
                 param.Name.toString(fmt);
             }
             else {
