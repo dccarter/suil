@@ -96,7 +96,7 @@ jobs:
         type: [ Debug, Release ]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifacts
+      - uses: actions/download-artifacts@v2
         with:
           name: Suil-${{ matrix.type }}
           path: ${{runner.workspace}}/artifacts
