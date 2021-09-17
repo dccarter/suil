@@ -85,7 +85,9 @@ namespace suil::rpc::jrpc {
             }
             else {
                 // push back result
-                jrpc::Result jres{std::move(*resp.result)};
+                jrpc::Result jres{json::Object()};
+                if (resp.result)
+                    jres = std::move(*resp.result);
                 res.emplace_back(std::move(jres));
             }
         }

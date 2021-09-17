@@ -15,6 +15,8 @@ using scc::Field;
 using scc::Node;
 using scc::Native;
 using scc::Visitor;
+using scc::Enum;
+using scc::EnumMember;
 
 namespace suil {
 
@@ -34,164 +36,170 @@ namespace suil {
 
     void HppSuilMetaGenerator::generate(scc::Formatter fmt, const scc::Type& ct)
     {
-        if (!ct.is<scc::Struct>()) {
-            throw scc::Exception("suil meta generator can only be used on structs");
+        if (ct.is<Enum>()) {
+            generateEnum(fmt, ct.as<Enum>());
         }
+        else if (ct.is<scc::Struct>()) {
+            UsingNamespace(getNamespace(), fmt);
+            auto& st = ct.as<Struct>();
+            if (st.IsUnion) {
+                generateUnion(fmt, st);
+            }
+            else {
+                generateStruct(fmt, st);
+            }
 
-        const auto& st = ct.as<scc::Struct>();
-        if (st.IsUnion) {
-            generateUnionVariant(fmt, st);
-        }
+            if (is(Kind::Wire)) {
+                Line(fmt) << "std::size_t maxByteSize() const;";
+                Line(fmt) << "static " << st.Name << " fromWire(suil::Wire&);";
+                Line(fmt) << "void toWire(suil::Wire&) const;";
+                Line(fmt);
+            }
 
-        fmt() << "struct ";
-        st.Name.toString(fmt);
-        fmt(true) << (st.IsUnion? ": iod::UnionType {": ": iod::MetaType {");
-        fmt.push(false);
-        if (st.IsUnion) {
-            generateUnion(fmt, st);
+            Line(--fmt)<< "};";
         }
         else {
-            generateStruct(fmt, st);
+            throw scc::Exception("suil meta generator does not support classes");
         }
 
-        if (is(Kind::Wire)) {
-            fmt() << "std::size_t maxByteSize() const;";
-            fmt() << "static ";
-            st.Name.toString(fmt);
-            fmt(true) << " fromWire(suil::Wire&);";
-            fmt() << "void toWire(suil::Wire&) const;";
-            fmt();
-        }
-
-        fmt.pop() << "};";
-        fmt();
+        Line(fmt);
     }
 
     void HppSuilMetaGenerator::generateUnionVariant(scc::Formatter& fmt, const scc::Struct& st)
     {
-        fmt() << "using ";
-        st.Name.toString(fmt);
-        fmt(true) << "UnionVariant = std::variant<";
+        Line(fmt) << "using " << st.Name <<"UnionVariant = std::variant<";
         bool first{true};
         Visitor<Struct>(st).visit<Field>([&](const Field& field) {
             if (!first) {
-                fmt(true) << ", ";
+                fmt << ", ";
             }
-            field.Type.toString(fmt);
+            fmt << field.Type;
             first = false;
         });
-        fmt(true) << ">;";
-        fmt() << "template <typename T>";
-        fmt() << "concept Is";
-        st.Name.toString(fmt);
-        fmt(true) << "UnionMember = requires {";
-        fmt.push(false);
+        fmt << ">;";
+        Line(fmt) << "template <typename T>";
+        Line(fmt) << "concept Is" << st.Name <<  "UnionMember = requires {";
+        ++fmt;
         first = true;
         Visitor<Struct>(st).visit<Field>([&](const Field& field) {
             if (!first) {
-                fmt(true) << " or";
+                fmt << " or";
             }
-            fmt() << "std::is_same_v<T, ";
-            field.Type.toString(fmt);
-            fmt(true) << ">";
+            Line(fmt) << "std::is_same_v<T, " << field.Type << ">";
             first = false;
         });
-        fmt(true) << ";";
-        fmt.pop() << "};";
-        fmt();
+        fmt << ";";
+        Line(--fmt)<< "};";
+        Line(fmt);
     }
 
     void HppSuilMetaGenerator::generateUnion(scc::Formatter& fmt, const scc::Struct& st)
     {
+        int unionVersionValue{0};
+        auto& unionVersion = get("sbgConfig", "unionVersion");
+        if (unionVersion) {
+            unionVersionValue = unionVersion;
+        }
+        switch (unionVersionValue) {
+            case 0:
+            case 1:
+                generateUnionV1(fmt, st);
+                break;
+            case 2:
+                generateUnionV2(fmt, st);
+                break;
+            default:
+                throw scc::Exception("unsupported union version '", unionVersionValue, "'");
+        }
+    }
+
+    void HppSuilMetaGenerator::generateUnionV1(scc::Formatter& fmt, const scc::Struct& st)
+    {
+
+        generateUnionVariant(fmt, st);
+
+        Line(fmt) << "struct " << st.Name << ": iod::UnionType {";
+        --fmt;
+
         // Generate constructor that accepts all types
-        fmt();
-        fmt() << "template <typename T>";
-        fmt.push() << "requires Is";
-        st.Name.toString(fmt);
-        fmt(true) << "UnionMember<T>";
-        fmt.pop();
-        st.Name.toString(fmt);
-        fmt(true) << "(T value)";
-        fmt.push() << ": Value(std::forward<T>(value))";
-        fmt.pop() << "{}";
+        Line(fmt);
+        Line(fmt) << "template <typename T>";
+        Line(++fmt) << "requires Is" << st.Name << "UnionMember<T>";
+        Line(--fmt) << st.Name << "(T value)";
+        Line(++fmt) << ": Value(std::forward<T>(value))";
+        Line(--fmt) << "{}";
         // Generate union members
-        fmt();
-        st.Name.toString(fmt);
-        fmt(true) << "() = default; ";
-        fmt();
-        fmt();
-        st.Name.toString(fmt);
-        fmt(true) << "UnionVariant Value;";
-        fmt() << "template <typename T>";
-        fmt.push() << "requires Is";
-        st.Name.toString(fmt);
-        fmt(true) << "UnionMember<T>";
-        fmt.pop()  << "bool has() const {";
-        fmt.push() << "return std::holds_alternative<T>(Value);";
-        fmt.pop()  << "}";
-        fmt();
-        fmt() << "template <typename T>";
-        fmt.push() << "requires Is";
-        st.Name.toString(fmt);
-        fmt(true) << "UnionMember<T>";
-        fmt.pop()  << "operator const T&() const {";
-        fmt.push() << "return std::get<T>(Value);";
-        fmt.pop()  << "}";
-        fmt();
-        fmt() << "bool Ok() const { return Value.index() != std::variant_npos; }";
-        fmt();
+        Line(fmt) << st.Name<< "() = default; ";
+        Line(fmt);
+        Line(fmt) << st.Name << "UnionVariant Value;";
+        Line(fmt) << "template <typename T>";
+        Line(++fmt) << "requires Is" << st.Name<< "UnionMember<T>";
+        Line(--fmt) << "bool has() const {";
+        Line(++fmt) << "return std::holds_alternative<T>(Value);";
+        Line(--fmt) << "}";
+        Line(fmt);
+        Line(fmt) << "template <typename T>";
+        Line(++fmt) << "requires Is" << st.Name << "UnionMember<T>";
+        Line(--fmt) << "operator const T&() const {";
+        Line(++fmt) << "return std::get<T>(Value);";
+        Line(--fmt) << "}";
+        Line(fmt);
+        Line(fmt) << "bool Ok() const { return Value.index() != std::variant_npos; }";
+        Line(fmt);
 
         if (is(Kind::Json)) {
-            fmt() << "static ";
-            st.Name.toString(fmt);
-            fmt(true) << " fromJson(const std::string& schema, iod::json::parser&);";
-            fmt() << "void toJson(iod::json::jstream&) const;";
-            fmt();
+            Line(fmt) << "static " << st.Name << " fromJson(const std::string& schema, iod::json::parser&);";
+            Line(fmt) << "void toJson(iod::json::jstream&) const;";
+            Line(fmt);
         }
 
-        fmt() << "const char* name() const;";
-        fmt.pop() << "private:";
-        fmt.push() << "static int index(const std::string& name);";
-        fmt.pop() << "public:";
-        fmt.push();
+        Line(fmt) << "const char* name() const;";
+        Line(--fmt)<< "private:";
+        Line(++fmt) << "static int index(const std::string& name);";
+        Line(--fmt)<< "public:";
+        Line(++fmt);
     }
+
+    void HppSuilMetaGenerator::generateUnionV2(scc::Formatter& fmt, const scc::Struct& st)
+    {}
 
     void HppSuilMetaGenerator::generateStruct(scc::Formatter& fmt, const scc::Struct& st)
     {
-        fmt() << "typedef decltype(iod::D(";
-        fmt.push(false);
+        Line(fmt) << "struct " <<  st.Name << ": iod::MetaType {";
+        ++fmt;
+
+        Line(fmt) << "typedef decltype(iod::D(";
+        ++fmt;
 
         // create type of meta
         bool first{true};
         Visitor<Struct>(st).visit<Field>([&](const Field& field) {
             if (!first) {
-                fmt(true) << ",";
+                fmt << ",";
             }
 
-            fmt() << "prop(";
+            Line(fmt) << "prop(";
             field.Name.toString(fmt);
             if (!field.Attribs.empty()) {
-                fmt(true) << "(";
+                fmt << "(";
                 for (const auto& attrib: field.Attribs) {
                     if (&attrib != &field.Attribs.front()) {
-                        fmt(true) << ", ";
+                        fmt << ", ";
                     }
                     attrib.scopedString(fmt, "var");
                     if (attrib.Params.size() == 1) {
-                        fmt(true) << " = var(" << attrib.Params[0].Content << ")";
+                        fmt << " = var(" << attrib.Params[0] << ")";
                     }
                 }
-                fmt(true) << ")";
+                fmt << ")";
             }
-            fmt(true) << ", ";
-            field.Type.toString(fmt);
-            fmt(true) << ")";
+            fmt << ", " << field.Type << ")";
             first = false;
         });
-        fmt.pop() << ")) Schema;";
-        fmt();
-        fmt() << "static const Schema Meta;";
-        fmt();
+        Line(--fmt)<< ")) Schema;";
+        Line(fmt);
+        Line(fmt) << "static const Schema Meta;";
+        Line(fmt);
         Visitor<Struct>(st).visit<Node>([&](const Node& node) {
             if (node.is<Native>() and !node.as<Native>().ForCpp) {
                 node.toString(fmt);
@@ -199,20 +207,56 @@ namespace suil {
             else {
                 if (node.is<Field>()) {
                     node.toString(fmt);
-                    fmt(true) << ';';
+                    fmt << ';';
                 } else {
                     node.toString(fmt);
                 }
-                fmt();
+                Line(fmt);
             }
         });
-        fmt();
+        Line(fmt);
         if (is(Kind::Json)) {
-            fmt() << "static ";
-            st.Name.toString(fmt);
-            fmt(true) << " fromJson(iod::json::parser&);";
-            fmt() << "void toJson(iod::json::jstream&) const;";
-            fmt();
+            Line(fmt) << "static " << st.Name << " fromJson(iod::json::parser&);";
+            Line(fmt) << "void toJson(iod::json::jstream&) const;";
+            Line(fmt);
+        }
+    }
+
+    void HppSuilMetaGenerator::generateEnum(scc::Formatter& fmt, const Enum& e)
+    {
+        {
+            UsingNamespace(getNamespace(), fmt);
+            Line(fmt) << "enum ";
+            e.Name.toString(fmt);
+            if (!e.Base.Content.empty()) {
+                // enum has a base
+                fmt << ": " << e.Base;
+            }
+            fmt << " {";
+            Line(++fmt);
+
+            bool first{true};
+            Visitor<Enum>(e).visit<EnumMember>([&](const EnumMember& member) {
+                if (!first) {
+                    Line(fmt) << ',';
+                }
+
+                fmt << member.Name;
+                if (!member.Value.empty()) {
+                    fmt << " = " << member.Value;
+                }
+                first = false;
+            });
+            Line(--fmt)<< "};";
+        }
+        {
+            UsingNamespace("iod", fmt);
+            auto name =  getNamespace() + "::" + e.Name.Content;
+            Line(fmt) << "template<>";
+            Line(fmt) << "struct is_meta_enum<" << name << "> : std::true_type {};";
+            Line(fmt);
+            Line(fmt) << "template <>";
+            Line(fmt) << "const iod::EnumMeta<" << name << ">& Meta<" << name << ">();";
         }
     }
 
@@ -222,232 +266,215 @@ namespace suil {
 
     void CppSuilMetaGenerator::generate(scc::Formatter fmt, const scc::Type& ct)
     {
-        if (!ct.is<scc::Struct>()) {
-            throw scc::Exception("suil meta generator can only be used on structs");
+        if (ct.is<Enum>()) {
+            generateEnum(fmt, ct.as<Enum>());
         }
-
-        const auto& st = ct.as<scc::Struct>();
-        if (st.IsUnion) {
-            generateUnion(fmt, st);
+        else if (ct.is<Struct>()) {
+            UsingNamespace(getNamespace(), fmt);
+            const auto& st = ct.as<scc::Struct>();
+            if (st.IsUnion) {
+                generateUnion(fmt, st);
+            } else {
+                generateStruct(fmt, st);
+            }
         }
         else {
-            generateStruct(fmt, st);
+            throw scc::Exception("suil meta generator supports enums and struct types only");
         }
     }
 
     void CppSuilMetaGenerator::generateUnion(scc::Formatter& fmt, const scc::Struct& st)
     {
         if (is(Kind::Wire)) {
-            fmt();
-            fmt() << "size_t ";
-            st.Name.toString(fmt);
-            fmt(true) << "::maxByteSize() const {";
-            fmt.push() << "std::size_t size{suil::VarInt(std::variant_size_v<";
-            st.Name.toString(fmt);
-            fmt(true) << "UnionVariant>).length()};";
-            fmt() << "std::visit([&](const auto& arg) {";
-            fmt.push() << "size += suil::Wire::maxByteSize(arg);";
-            fmt.pop() << "}, Value);";
-            fmt() << "return size;";
-            fmt.pop() << "}";
-            fmt();
+            Line(fmt) << "size_t " << st.Name << "::maxByteSize() const {";
+            Line(++fmt)
+                << "std::size_t size{suil::VarInt(std::variant_size_v<"
+                << st.Name
+                << "UnionVariant>).length()};";
+            Line(fmt) << "std::visit([&](const auto& arg) {";
+            Line(++fmt) << "size += suil::Wire::maxByteSize(arg);";
+            Line(--fmt)<< "}, Value);";
+            Line(fmt) << "return size;";
+            Line(--fmt)<< "}";
+            Line(fmt);
 
-            fmt();
-            st.Name.toString(fmt);
-            fmt(true) << " ";
-            st.Name.toString(fmt);
-            fmt(true) << "::fromWire(suil::Wire& w) {";
-            fmt.push();
-            st.Name.toString(fmt);
-            fmt(true) << " tmp{};";
-            fmt() << "suil::VarInt index{0};";
-            fmt() << "w >> index;";
-            fmt() << "switch(std::size_t(index)) {";
-            fmt.push(false);
+            Line(fmt) << st.Name << " "<< st.Name << "::fromWire(suil::Wire& w) {";
+            Line(++fmt) << st.Name << " tmp{};";
+            Line(fmt) << "suil::VarInt index{0};";
+            Line(fmt) << "w >> index;";
+            Line(fmt) << "switch(std::size_t(index)) {";
+            ++fmt;
             int index{0};
             Visitor<Struct>(st).visit<Field>([&](const Field& field) {
-                fmt() << "case ";
-                fmt(true) << index++ << ": {";
-                fmt.push(false);
-                fmt() << "tmp.Value = ";
-                field.Type.toString(fmt);
-                fmt(true) << "{};";
-                fmt() << "w >> (std::get<";
-                field.Type.toString(fmt);
-                fmt(true) << ">(tmp.Value));";
-                fmt() << "break;";
-                fmt.pop() << "}";
+                Line(fmt) << "case " << index++ << ": {";
+                ++fmt;
+                Line(fmt) << "tmp.Value = " << field.Type << "{};";
+                Line(fmt) << "w >> (std::get<" << field.Type << ">(tmp.Value));";
+                Line(fmt) << "break;";
+                Line(--fmt)<< "}";
             });
-            fmt() << "case std::variant_npos: {";
-            fmt.push() << "// invalid variant specified on other size";
-            fmt() << "break;";
-            fmt.pop() << "}";
-            fmt() << "default:";
-            fmt.push()
+            Line(fmt) << "case std::variant_npos: {";
+            Line(++fmt) << "// invalid variant specified on other size";
+            Line(fmt) << "break;";
+            Line(--fmt)<< "}";
+            Line(fmt) << "default:";
+            Line(++fmt)
                     << R"(throw suil::UnsupportedUnionMember("Type '", std::size_t(index), "' is not a a member of this union");)";
-            fmt.pop(false);
-            fmt.pop() << "}";
-            fmt() << "return std::move(tmp);";
-            fmt.pop() << "}";
-            fmt();
-            fmt() << "void ";
-            st.Name.toString(fmt);
-            fmt(true) << "::toWire(suil::Wire& w) const {";
-            fmt.push() << "suil::VarInt sz{Value.index()};";
-            fmt() << "w << sz;";
-            fmt() << "if (Value.index() == std::variant_npos) {";
-            fmt.push() << "// invalid value, do not serialize";
-            fmt() << "return;";
-            fmt.pop() << "}";
-            fmt() << "std::visit([&](const auto& arg) {";
-            fmt.push() << "w << arg;";
-            fmt.pop() << "}, Value);";
-            fmt.pop() << "}";
+            --fmt;
+            Line(--fmt) << "}";
+            Line(fmt) << "return std::move(tmp);";
+            Line(--fmt)<< "}";
+            Line(fmt);
+            Line(fmt) << "void " << st.Name<< "::toWire(suil::Wire& w) const {";
+            Line(++fmt) << "suil::VarInt sz{Value.index()};";
+            Line(fmt) << "w << sz;";
+            Line(fmt) << "if (Value.index() == std::variant_npos) {";
+            Line(++fmt) << "// invalid value, do not serialize";
+            Line(fmt) << "return;";
+            Line(--fmt)<< "}";
+            Line(fmt) << "std::visit([&](const auto& arg) {";
+            Line(++fmt) << "w << arg;";
+            Line(--fmt)<< "}, Value);";
+            Line(--fmt)<< "}";
         }
 
         if (is(Kind::Json)) {
-            fmt();
-            st.Name.toString(fmt);
-            fmt(true) << ' ';
-            st.Name.toString(fmt);
-            fmt(true) << "::fromJson(const std::string& schema, iod::json::parser& p) {";
-            fmt.push();
-            st.Name.toString(fmt);
-            fmt(true) << " tmp{};";
-            fmt() << "switch(index(schema)) {";
+            fmt << st.Name << ' ' << st.Name
+                      << "::fromJson(const std::string& schema, iod::json::parser& p) {";
+            Line(++fmt) << st.Name << " tmp{};";
+            Line(fmt) << "switch(index(schema)) {";
             int index = 0;
             Visitor<Struct>(st).visit<Field>([&](const Field& field) {
-                fmt() << "case " << index++ << ": {";
-                fmt.push();
-                field.Type.toString(fmt);
-                fmt(true) << ' ';
-                field.Name.toString(fmt);
-                fmt(true) << ';';
-                fmt() << "iod::json_internals::iod_from_json_((";
-                field.Type.toString(fmt);
-                fmt(true) << " *) 0, ";
-                field.Name.toString(fmt);
-                fmt(true) << ", p);";
-                fmt() << "tmp = std::move(";
-                field.Name.toString(fmt);
-                fmt(true) << ");";
-                fmt() << "break;";
-                fmt.pop() << "}";
+                Line(fmt) << "case " << index++ << ": {";
+                Line(++fmt) << field.Type << ' ' << field.Name << ';';
+                Line(fmt) << "iod::json_internals::iod_from_json_(("
+                          << field.Type << " *) 0, " << field.Name << ", p);";
+                Line(fmt) << "tmp = std::move(" << field.Name << ");";
+                Line(fmt) << "break;";
+                Line(--fmt)<< "}";
             });
-            fmt() << "default:";
-            fmt.push()
+            Line(fmt) << "default:";
+            Line(++fmt)
                     << R"(throw suil::UnsupportedUnionMember("Type '", std::size_t(index), "' is not a a member of this union");)";
-            fmt.pop() << "}";
-            fmt() << "return std::move(tmp);";
-            fmt.pop() << "}";
+            Line(--fmt)<< "}";
+            Line(fmt) << "return std::move(tmp);";
+            Line(--fmt)<< "}";
         }
 
-        fmt();
-        fmt() << "const char* ";
-        st.Name.toString(fmt);
-        fmt(true) << "::name() const {";
-        fmt.push() << "switch(Value.index()) {";
+        Line(fmt) << "const char* " << st.Name << "::name() const {";
+        Line(++fmt) << "switch(Value.index()) {";
         int index = 0;
         Visitor<Struct>(st).visit<Field>([&](const Field& field) {
-            fmt() << "case " << index++ << ": {";
-            fmt.push() << "return \"";
-            field.Name.toString(fmt);
-            fmt(true) << "\";";
-            fmt() << "break;";
-            fmt.pop() << "}";
+            Line(fmt) << "case " << index++ << ": {";
+            Line(++fmt) << "return \"" << field.Name << "\";";
+            Line(fmt) << "break;";
+            Line(--fmt)<< "}";
         });
-        fmt() << "default:";
-        fmt.push() << R"(throw suil::UnsupportedUnionMember("Type '", std::size_t(index), "' is not a a member of this union");)";
-        fmt.pop() << "}";
-        fmt() << "return \"\";";
-        fmt.pop() << "}";
-        fmt();
+        Line(fmt) << "default:";
+        Line(++fmt) << R"(throw suil::UnsupportedUnionMember("Type '", std::size_t(index), "' is not a a member of this union");)";
+        Line(--fmt)<< "}";
+        Line(fmt) << "return \"\";";
+        Line(--fmt)<< "}";
+        Line(fmt);
 
-        fmt() << "int ";
+        Line(fmt) << "int ";
         st.Name.toString(fmt);
-        fmt(true) << "::index(const std::string& name) {";
+        fmt << "::index(const std::string& name) {";
         index = 0;
-        fmt.push();
+        Line(++fmt);
         Visitor<Struct>(st).visit<Field>([&](const Field& field) {
             if (index != 0) {
-                fmt(true) << "else ";
+                fmt << "else ";
             }
-            fmt(true) << "if (name == \"";
-            field.Name.toString(fmt);
-            fmt(true) << "\") {";
-            fmt.push() << "return " << index++ << "; ";
-            fmt.pop() << "}";
-            fmt();
+            fmt << "if (name == \"" << field.Name << "\") {";
+            Line(++fmt) << "return " << index++ << "; ";
+            Line(--fmt)<< "}";
+            Line(fmt);
         });
-        fmt() << R"(throw suil::UnsupportedUnionMember("Type '", name, "' is not a a member of this union");)";
-        fmt() << "return int(std::variant_npos);";
-        fmt.pop() << '}';
-        fmt();
+        Line(fmt) << R"(throw suil::UnsupportedUnionMember("Type '", name, "' is not a a member of this union");)";
+        Line(fmt) << "return int(std::variant_npos);";
+        Line(--fmt)<< '}';
+        Line(fmt);
     }
 
     void CppSuilMetaGenerator::generateStruct(scc::Formatter& fmt, const scc::Struct& st)
     {
-        fmt();
-        fmt() << "const ";
-        st.Name.toString(fmt);
-        fmt(true) << "::Schema ";
-        st.Name.toString(fmt);
-        fmt(true) << "::Meta{};";
-        fmt();
+        Line(fmt) << "const " << st.Name << "::Schema " << st.Name << "::Meta{};";
+        Line(fmt);
         if (is(Kind::Json)) {
-            fmt();
-            st.Name.toString(fmt);
-            fmt(true) << ' ';
-            st.Name.toString(fmt);
-            fmt(true) << "::fromJson(iod::json::parser& p) {";
-            fmt.push();
-            st.Name.toString(fmt);
-            fmt(true) << " tmp{};";
-            fmt() << "p >> p.spaces >> '{';";
-            fmt() << "iod::json::iod_attr_from_json(&";
-            st.Name.toString(fmt);
-            fmt(true) << "::Meta, tmp, p);";
-            fmt() << "p >> p.spaces >> '}';";
-            fmt() << "return tmp;";
-            fmt.pop() << "}";
-            fmt();
+            Line(fmt) << st.Name << ' ' << st.Name << "::fromJson(iod::json::parser& p) {";
+            Line(++fmt) << st.Name << " tmp{};";
+            Line(fmt) << "p >> p.spaces >> '{';";
+            Line(fmt) << "iod::json::iod_attr_from_json(&"
+                      << st.Name << "::Meta, tmp, p);";
+            Line(fmt) << "p >> p.spaces >> '}';";
+            Line(fmt) << "return tmp;";
+            Line(--fmt) << "}";
+            Line(fmt);
 
-            fmt() << "void ";
-            st.Name.toString(fmt);
-            fmt(true) << "::toJson(iod::json::jstream& ss) const {";
-            fmt.push() << "suil::json::metaToJson(Ego, ss);";
-            fmt.pop() << "}";
-            fmt();
+            Line(fmt) << "void " << st.Name << "::toJson(iod::json::jstream& ss) const {";
+            Line(++fmt) << "suil::json::metaToJson(Ego, ss);";
+            Line(--fmt)<< "}";
+            Line(fmt);
         }
 
         if (is(Kind::Wire)) {
-            fmt() << "size_t ";
-            st.Name.toString(fmt);
-            fmt(true) << "::maxByteSize() const {";
-            fmt.push() << "return suil::metaMaxByteSize(Ego);";
-            fmt.pop() << "}";
-            fmt();
+            Line(fmt) << "size_t " << st.Name << "::maxByteSize() const {";
+            Line(++fmt) << "return suil::metaMaxByteSize(Ego);";
+            Line(--fmt) << "}";
+            Line(fmt);
 
-            fmt();
-            st.Name.toString(fmt);
-            fmt(true) << " ";
-            st.Name.toString(fmt);
-            fmt(true) << "::fromWire(suil::Wire& w) {";
-            fmt.push();
-            st.Name.toString(fmt);
-            fmt(true) << " tmp{};";
-            fmt() << "suil::metaFromWire(tmp, w);";
-            fmt() << "return tmp;";
-            fmt.pop() << "}";
-            fmt();
+            Line(fmt) << st.Name << " " << st.Name
+                      << "::fromWire(suil::Wire& w) {";
+            Line(++fmt) << st.Name << " tmp{};";
+            Line(fmt) << "suil::metaFromWire(tmp, w);";
+            Line(fmt) << "return tmp;";
+            Line(--fmt)<< "}";
+            Line(fmt);
 
-            fmt() << "void ";
-            st.Name.toString(fmt);
-            fmt(true) << "::toWire(suil::Wire& w) const {";
-            fmt.push() << "suil::metaToWire(Ego, w);";
-            fmt.pop() << "}";
+            Line(fmt) << "void " << st.Name << "::toWire(suil::Wire& w) const {";
+            Line(++fmt) << "suil::metaToWire(Ego, w);";
+            Line(--fmt)<< "}";
         }
-        fmt();
+        Line(fmt);
+    }
+
+    void CppSuilMetaGenerator::generateEnum(scc::Formatter& fmt, const scc::Enum& e)
+    {
+        Line(fmt) << "using " << getNamespace() << "::" <<  e.Name << ";";
+        Line(fmt);
+
+        UsingNamespace("iod", fmt);
+        Line(fmt) << "template <>";
+        Line(fmt) << "const iod::EnumMeta<" << e.Name
+                  << ">& Meta<" << e.Name << ">() {";
+        Line(++fmt);
+        Line(fmt) << "static const EnumMeta<" << e.Name << "> sMeta = {";
+            Line(++fmt) << '"' << e.Name << "\",";
+            Line(fmt) << "{";
+                ++fmt;
+                bool first{true};
+                Visitor<Enum>(e).visit<EnumMember>([&](const EnumMember& member) {
+                    if (!first) {
+                        fmt << ',';
+                    }
+
+                    Line(fmt) << "EnumEntry(" << e.Name << ", " << member.Name << ")";
+                    first = false;
+                });
+                --fmt;
+            Line(fmt) << "},";
+            if (scc::Attribute::find(e.Attribs, {"sbg", "enum"}).has("encname")) {
+                Line(fmt) << "true";
+            }
+            else {
+                Line(fmt) << "false";
+            }
+            --fmt;
+        Line(fmt) << "};";
+        Line(fmt) << "return sMeta;";
+
+        Line(--fmt)<< "}";
     }
 }
 

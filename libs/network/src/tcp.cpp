@@ -302,10 +302,11 @@ static coroutine void handleSocket(Socket::UPtr sock) {
 }
 
 
-static coroutine void accept(TcpServerSock& server)
+static coroutine void accept(TcpServerSock::Ptr& server)
 {
-    while (server.isRunning()) {
-        if (auto sock = server.accept()) {
+    auto s = server;
+    while (s->isRunning()) {
+        if (auto sock = s->accept()) {
             go(handleSocket(std::move(sock)));
         }
     }
@@ -322,12 +323,13 @@ TEST_CASE("Using TCP Client/Server", "[net][tcp]")
     }
 
     SECTION("Interacting with a TCP server") {
-        TcpServerSock server;
-        auto status = server.listen(addr, 3);
+        TcpServerSock::Ptr server{new TcpServerSock};
+        auto status = server->listen(addr, 3);
         REQUIRE(status);
+
         go(accept(server));
 
-        //WHEN("When connecting to a server") {
+         WHEN("When connecting to a server") {
             TcpSock s1, s2, s3, s4;
             // following connection's should succeed
             status = s1.connect(addr, 500);
@@ -341,9 +343,9 @@ TEST_CASE("Using TCP Client/Server", "[net][tcp]")
             // Cannot connect an already connected socket
             status = s4.connect(addr, 500);
             REQUIRE_FALSE(status);
-        //}
+        }
 
-        server.close();
+        server->close();
     }
 }
 

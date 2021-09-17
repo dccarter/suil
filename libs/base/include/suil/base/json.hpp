@@ -11,6 +11,7 @@
 #include "suil/base/buffer.hpp"
 #include "suil/base/blob.hpp"
 #include "suil/base/logging.hpp"
+#include "suil/base/meta.hpp"
 
 #include <iod/json.hh>
 

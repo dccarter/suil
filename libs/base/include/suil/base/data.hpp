@@ -71,7 +71,7 @@ namespace suil {
         /**
          * @return true if the size of the Data instance
          */
-        inline bool empty() {
+        inline bool empty() const {
             return Ego.m_size == 0;
         }
 
@@ -140,6 +140,18 @@ namespace suil {
          * @return a Data instance which is a copy of the calling instance
          */
         Data copy() const;
+
+        /**
+         * Releases ownership of the underlying buffer
+         * @return
+         */
+        uint8* release();
+
+        /**
+         * Releases ownership of the underlying buffer
+         * @return
+         */
+        Data release(size_t resize);
 
         /**
          * Clears the Data instance by deallocating memory if the instance
