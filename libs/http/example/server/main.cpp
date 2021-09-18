@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 
     net::ServerConfig sock = {
         .socketConfig = net::TcpSocketConfig{
-            .bindAddr = { .name = "0.0.0.0", .port = 8100 }
+            .bindAddr = { .name = "0.0.0.0", .port = 8000 }
         }
     };
 
