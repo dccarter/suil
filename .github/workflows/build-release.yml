@@ -13,7 +13,7 @@ jobs:
     container: suilteam/base:alpine
     strategy:
       matrix:
-        type: [Debug, Release]
+        type: [Debug]
 
     steps:
       - uses: actions/checkout@v2
@@ -28,14 +28,15 @@ jobs:
           cd build-${{ matrix.type }}
           cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} \
                                   -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }} \
-                                  -DSUIL_VERSION=$VERSION
+                                  -DSUIL_VERSION=$VERSION \
+                                  -DENABLE_UNIT_TESTS=OFF
 
       # Build project dependencies
-      - name: Build Dependecies
-        shell: bash
-        run: |
-          cd ${{runner.workspace}}/build-${{ matrix.type }}
-          make catch -j4
+#      - name: Build Dependecies
+#        shell: bash
+#        run: |
+#          cd build-${{ matrix.type }}
+#          make catch -j4
 
       # Build project
       - name: Build
@@ -44,16 +45,12 @@ jobs:
           cd build-${{ matrix.type }}
           make -j4 install
 
-      - name: UnitTests
-        shell: bash
-        run: |
-          cd build-${{ matrix.type }}
-          ./libs/base/base_unittest -r junit -o base_unittest.xml
-          ./libs/network/net_unittest -r junit -o net_unittest.xml
-          ./libs/database/db_unittest -r junit -o db_unittest.xml
-          ./libs/rpc/rpc_unittest -r junit -o rpc_unittest.xml
-          ./libs/http/httpserver_unittest -r junit -o httpserver_unittest.xml
-          ./libs/http/httpclient_unittest -r junit -o httpclient_unittest.xml
+
+#      - name: UnitTests
+#        shell: bash
+#        run: |
+#          cd build-${{ matrix.type }}
+#          ./libs/base/base_unittest -r junit -o base_unittest.xml
 
       - name: Create build artifact
         shell: bash
@@ -66,7 +63,6 @@ jobs:
         with:
           name: Suil-${{ matrix.type }}
           path: build-${{ matrix.type }}/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
-
 
   release0:
     runs-on: ubuntu-latest
@@ -94,7 +90,7 @@ jobs:
     needs: release0
     strategy:
       matrix:
-        type: [ Debug, Release ]
+        type: [ Debug ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
@@ -108,6 +104,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release0.outputs.upload_url }}
-          assert_path: artifacts/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
-          assert_name: Suil-$VERSION-${{ matrix.type }}
+          asset_path: artifacts/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
+          asset_name: Suil-$VERSION-${{ matrix.type }}
           asset_content_type: application/zip
