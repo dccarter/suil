@@ -2,8 +2,9 @@ name: Development Build
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - v*
+
 env:
   VERSION: 0.1.0
 
@@ -13,7 +14,7 @@ jobs:
     container: suilteam/base:alpine
     strategy:
       matrix:
-        type: [Debug]
+        type: [Debug, Release]
 
     steps:
       - uses: actions/checkout@v2
@@ -32,11 +33,11 @@ jobs:
                                   -DENABLE_UNIT_TESTS=OFF
 
       # Build project dependencies
-#      - name: Build Dependecies
-#        shell: bash
-#        run: |
-#          cd build-${{ matrix.type }}
-#          make catch -j4
+      - name: Build Dependecies
+        shell: bash
+        run: |
+          cd build-${{ matrix.type }}
+          make catch -j4
 
       # Build project
       - name: Build
@@ -46,11 +47,17 @@ jobs:
           make -j4 install
 
 
-#      - name: UnitTests
-#        shell: bash
-#        run: |
-#          cd build-${{ matrix.type }}
-#          ./libs/base/base_unittest -r junit -o base_unittest.xml
+      - name: UnitTests
+        shell: bash
+        run: |
+          cd build-${{ matrix.type }}
+          ./libs/base/base_unittest -r junit -o base_unittest.xml
+          ./libs/network/net_unittest -r junit -o net_unittest.xml
+          ./libs/database/db_unittest -r junit -o db_unittest.xml
+          ./libs/rpc/rpc_unittest -r junit -o rpc_unittest.xml
+          ./libs/http/httpserver_unittest -r junit -o httpserver_unittest.xml
+          ./libs/http/httpclient_unittest -r junit -o httpclient_unittest.xml
+
 
       - name: Create build artifact
         shell: bash
@@ -68,6 +75,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Get Version
+        id: tag_version
+        run: |
+          echo ::set-output name=version::${GITHUB_REF#refs/*/}
       - uses: actions/checkout@v2
       - name: Create Release
         id: create_release
@@ -75,8 +86,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.VERSION }}
-          release_name: Release ${{ env.VERSION }}
+          tag_name: ${{ steps.tag_version.outputs.version }}
+          release_name: Release ${{ steps.tag_version.outputs.version }}
           body: |
             Changes in this Release
             - Initial release
@@ -84,13 +95,14 @@ jobs:
           prerelease: false
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.tag_version.outputs.version }}
 
   release:
     runs-on: ubuntu-latest
     needs: release0
     strategy:
       matrix:
-        type: [ Debug ]
+        type: [ Debug, Release ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
@@ -105,5 +117,5 @@ jobs:
         with:
           upload_url: ${{ needs.release0.outputs.upload_url }}
           asset_path: artifacts/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
-          asset_name: Suil-$VERSION-${{ matrix.type }}
+          asset_name: Suil-${{ env.VERSION }}-${{ matrix.type }}
           asset_content_type: application/zip
