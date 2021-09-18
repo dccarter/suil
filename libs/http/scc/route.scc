@@ -55,7 +55,7 @@ namespace suil::http::server {
         Auth   Authorize;
         bool   ParseCookies{false};
         bool   ParseForm{false};
-        String ReplyType;
+        String ReplyType{"text/plain"};
         bool   Enabled{true};
     };
 

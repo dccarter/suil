@@ -63,7 +63,6 @@ namespace server {
             : _status{http::Ok}
         {
             Ego._body << t;
-            setContentType("application/json");
         }
 
         MOVE_CTOR(Response) noexcept;
