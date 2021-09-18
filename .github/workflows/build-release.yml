@@ -29,8 +29,7 @@ jobs:
           cd build-${{ matrix.type }}
           cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} \
                                   -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }} \
-                                  -DSUIL_VERSION=$VERSION \
-                                  -DENABLE_UNIT_TESTS=OFF
+                                  -DSUIL_VERSION=$VERSION
 
       # Build project dependencies
       - name: Build Dependecies
