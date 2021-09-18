@@ -2,8 +2,9 @@ name: Development Build
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - v*
+
 env:
   VERSION: 0.1.0
 
@@ -19,35 +20,37 @@ jobs:
       - uses: actions/checkout@v2
       # Create a build directory
       - name: Create Build Environment
-        run: cmake -E make_directory ${{runner.workspace}}/build-${{ matrix.type }}
+        run: cmake -E make_directory build-${{ matrix.type }}
 
       # Configure CMake project
       - name: Configure CMake
         shell: bash
         run: |
-          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          cd build-${{ matrix.type }}
           cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} \
-                                  -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/artifacts/${{ matrix.type }} \
-                                  -DSUIL_VERSION=$VERSION
+                                  -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }} \
+                                  -DSUIL_VERSION=$VERSION \
+                                  -DENABLE_UNIT_TESTS=OFF
 
       # Build project dependencies
       - name: Build Dependecies
         shell: bash
         run: |
-          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          cd build-${{ matrix.type }}
           make catch -j4
 
       # Build project
       - name: Build
         shell: bash
         run: |
-          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          cd build-${{ matrix.type }}
           make -j4 install
+
 
       - name: UnitTests
         shell: bash
         run: |
-          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          cd build-${{ matrix.type }}
           ./libs/base/base_unittest -r junit -o base_unittest.xml
           ./libs/network/net_unittest -r junit -o net_unittest.xml
           ./libs/database/db_unittest -r junit -o db_unittest.xml
@@ -55,22 +58,27 @@ jobs:
           ./libs/http/httpserver_unittest -r junit -o httpserver_unittest.xml
           ./libs/http/httpclient_unittest -r junit -o httpclient_unittest.xml
 
+
       - name: Create build artifact
         shell: bash
         run: |
-          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          cd build-${{ matrix.type }}
           make package
+
       - name: Save build artifact
         uses: actions/upload-artifact@v2
         with:
           name: Suil-${{ matrix.type }}
-          path: ${{runner.workspace}}/build-${{ matrix.type }}/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
-
+          path: build-${{ matrix.type }}/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
 
   release0:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Get Version
+        id: tag_version
+        run: |
+          echo ::set-output name=version::${GITHUB_REF#refs/*/}
       - uses: actions/checkout@v2
       - name: Create Release
         id: create_release
@@ -78,8 +86,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ steps.tag_version.outputs.version }}
+          release_name: Release ${{ steps.tag_version.outputs.version }}
           body: |
             Changes in this Release
             - Initial release
@@ -87,6 +95,7 @@ jobs:
           prerelease: false
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.tag_version.outputs.version }}
 
   release:
     runs-on: ubuntu-latest
@@ -96,10 +105,10 @@ jobs:
         type: [ Debug, Release ]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifacts@v2
+      - uses: actions/download-artifact@v2
         with:
           name: Suil-${{ matrix.type }}
-          path: ${{runner.workspace}}/artifacts
+          path: artifacts
 
       - name: Upload Release Artifacts
         uses: actions/upload-release-asset@v1
@@ -107,6 +116,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release0.outputs.upload_url }}
-          assert_path: ${{runner.workspace}}/artifacts/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
-          assert_name: Suil-$VERSION-${{ matrix.type }}
+          asset_path: artifacts/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
+          asset_name: Suil-${{ env.VERSION }}-${{ matrix.type }}
           asset_content_type: application/zip
