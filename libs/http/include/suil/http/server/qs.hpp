@@ -23,15 +23,16 @@ namespace suil::http::server {
         std::vector<String> getAll(const String& name) const;
 
         template <typename T>
-        T get(const String& name, bool throws = false) const {
+        Return<T> get(const String& name) const {
             auto str = get(name);
-            if (!str.empty()) {
-                T tmp{};
-                suil::cast(str, tmp);
-                return tmp;
-            }
-
-            throw KeyNotFound("Query string does not contain key '", name, "'");
+            return TryCatch<T>([&]() -> Return<T> {
+                if (!str.empty()) {
+                    T tmp{};
+                    suil::cast(str, tmp);
+                    return tmp;
+                }
+                return KeyNotFound{"Query string does not contain key '", name, "'"};
+            });
         }
 
     private:

@@ -157,13 +157,15 @@ namespace suil {
     struct Return : public std::variant<V, E> {
         using std::variant<V, E>::variant;
         operator bool() const { return std::holds_alternative<V>(Ego); }
+        V& operator*() { return std::get<V>(Ego); }
+        const V& operator*() const { return std::get<V>(Ego); }
         const E& exception() const { return std::get<E>(Ego); }
         const V& value() const { return std::get<V>(Ego); }
-        E moveException() { return std::get<E>(std::move(Ego)); }
-        V moveValue() { return std::get<V>(Ego); }
-        void throwIfException() {
+        E& exception() { return std::get<E>(Ego); }
+        V& value() { return std::get<V>(Ego); }
+        void raise() {
             if (!Ego) {
-                throw moveException();
+                throw std::move(exception());
             }
         }
     };
