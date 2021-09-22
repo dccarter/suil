@@ -270,6 +270,10 @@ if (NOT SUIL_INCLUDED)
             endif()
         endif()
 
+        if (SUIL_TARGET_DEPENDS)
+            add_dependencies(${name} ${SUIL_TARGET_DEPENDS})
+        endif()
+
         if (SUIL_TARGET_INSTALL)
             if (SUIL_TARGET_LIBRARY)
                 set(SUIL_PROJECT_HAS_EXPORTS ON PARENT_SCOPE)

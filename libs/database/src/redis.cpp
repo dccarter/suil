@@ -655,10 +655,10 @@ namespace suil::db {
     RedisClient& RedisDb::connect(int db)
     {
         auto it = fromCache(db);
-        bool fromCache{true};
+        bool isFromCache{true};
         if (it == Ego.clients.end()) {
             it = newConnection();
-            fromCache = false;
+            isFromCache = false;
         }
 
         auto& cli = *it;
@@ -667,7 +667,7 @@ namespace suil::db {
             throw RedisDbError("redis - ping Request failed");
         }
 
-        if (!fromCache) {
+        if (!isFromCache) {
             itrace("changing database to %d", db);
             auto resp = cli("SELECT", db);
             if (!resp) {

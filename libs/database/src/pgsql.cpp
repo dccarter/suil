@@ -209,6 +209,7 @@ namespace suil::db {
             } while (conns.empty() && y--);
         }
 
+        // Still holding mutex
         if (conn == nullptr){
             // try find connection from cached list
             if(!conns.empty()){
