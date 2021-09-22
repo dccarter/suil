@@ -47,7 +47,7 @@ namespace suil::saw {
             return;
         }
 
-        auto state = ret.moveValue();
+        auto state = std::move(ret.value());
         if (!state.empty()) {
             auto obj = json::Object::decode(state);
             auto value = (int32_t) obj(name());
@@ -63,7 +63,7 @@ namespace suil::saw {
             return;
         }
 
-        auto states = ret.moveValue();
+        auto states = std::move(ret.value());
         for (auto& state: states) {
             auto obj = json::Object::decode(state);
             for (auto& [key, val] : obj) {
