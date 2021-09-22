@@ -275,7 +275,7 @@ namespace suil::db {
 
         do {
             /* if notified to exit, exit immediately*/
-            db.pruneEvent.wait(lk, expires);
+            db.pruneEvent.wait(lk, Deadline{expires});
             if (db.aborting) break;
 
             /* was not forced to exit */

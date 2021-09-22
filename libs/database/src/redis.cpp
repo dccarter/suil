@@ -781,7 +781,7 @@ namespace suil::db {
         }
 
         do {
-            db.pruneEvt.wait(lk, expires);
+            db.pruneEvt.wait(lk, Deadline{expires});
             if (db.aborting)
                 break;
 

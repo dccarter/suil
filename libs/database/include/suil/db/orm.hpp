@@ -35,6 +35,11 @@ namespace suil::db {
     template <typename T>
     using removePrimaryKeyFields = decltype(removeMembersWithAttr(std::declval<T>(), sym(PRIMARY_KEY)));
 
+    template <typename R, typename S>
+    struct HasSymbol {
+        static constexpr bool value = ((iod::IsMetaType<R> or iod::is_sio<R>::value) and iod::has_symbol<R, S>::value);
+    };
+
     template <typename Connection, typename Type>
         requires iod::IsMetaType<Type>
     class Orm {
@@ -49,11 +54,11 @@ namespace suil::db {
         using AutoIncrementKeys = extractAutoIncrementFields<Schema>;
 
         template <typename Column>
-        using IsUniqueKey = iod::has_symbol<UniqueKeys, typename Column::left_t>;
+        using IsUniqueKey = HasSymbol<UniqueKeys, typename Column::left_t>;
         template <typename Column>
-        using IsPrimaryKey = iod::has_symbol<UniqueKeys, typename Column::left_t>;
+        using IsPrimaryKey = HasSymbol<PrimaryKeys, typename Column::left_t>;
         template <typename Column>
-        using IsAutoIncrementKey = iod::has_symbol<AutoIncrementKeys, typename Column::left_t>;
+        using IsAutoIncrementKey = HasSymbol<AutoIncrementKeys, typename Column::left_t>;
         template <typename T>
         static constexpr bool IsQueryColumn = IsUniqueKey<T>::value or IsPrimaryKey<T>::value or IsAutoIncrementKey<T>::value;
 
@@ -128,8 +133,8 @@ namespace suil::db {
             qb << "INSERT INTO " << mTable << " (";
             bool first{true};
             int  index{1};
-            using _Temp = removeIgnoreFields<WithoutAutoIncrement>;
-            auto values = iod::foreach2(_Temp{}) | [&](const auto& m) {
+            using WoIgnore = removeIgnoreFields<WithoutAutoIncrement>;
+            auto values = iod::foreach2(WoIgnore{}) | [&](const auto& m) {
                 if (!first) {
                     qb << ", ";
                     vb << ", ";
@@ -207,8 +212,8 @@ namespace suil::db {
             qb << "UPDATE " << mTable << " SET ";
             bool first{true};
             int index{1};
-            using _Temp = removeIgnoreFields<WithoutAutoIncrement>;
-            auto values = iod::foreach2(_Temp{}) | [&](const auto& m) {
+            using WoIgnore = removeIgnoreFields<WithoutAutoIncrement>;
+            auto values = iod::foreach2(WoIgnore{}) | [&](const auto& m) {
                 if (!first) {
                     qb << ", ";
                 }
