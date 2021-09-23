@@ -168,6 +168,13 @@ namespace suil {
                 throw std::move(exception());
             }
         }
+
+        Return<V, E> operator||(V value) {
+            if (!std::holds_alternative<V>(Ego)) {
+                return {std::move(value)};
+            }
+            return std::move(Ego);
+        }
     };
 
     template <typename R, typename F, typename... Args>
