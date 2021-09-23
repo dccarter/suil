@@ -84,7 +84,7 @@ namespace suil::db {
     PgSqlStatement PgSqlConnection::operator()(Buffer& req)
     {
         String tmp{req, false};
-        itrace("%s", tmp());
+        itrace(PRIs, _PRIs(tmp));
 
         auto it = stmtCache.find(tmp);
         if (it != stmtCache.end()) {
