@@ -155,8 +155,8 @@ namespace suil::db {
 
         bool cifne(bool trunc = false)
         {
-            if (conn.hasTable(mTable)) {
-                return conn.createTable(mTable, std::declval<WithoutIgnore>());
+            if (!conn.hasTable(mTable)) {
+                return conn.createTable(mTable, WithoutIgnore{});
             }
 
             if (trunc) {

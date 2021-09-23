@@ -351,15 +351,15 @@ namespace suil::db {
                         bins,
                         0);
                 if (!status) {
-                    ierror("ASYNC QUERY: %s failed: %s", stmt(), PQerrorMessage(conn));
-                    throw PgSqlException("ASYNC QUERY: %s failed: %s", stmt(), PQerrorMessage(conn));
+                    ierror("[%d] ASYNC QUERY: %s failed: %s", sock, stmt(), PQerrorMessage(conn));
+                    throw PgSqlException("[", sock, "] ASYNC QUERY: ", stmt(), " failed: ", PQerrorMessage(conn));
                 }
 
                 bool wait = true, err = false;
                 while (!err && PQflush(conn)) {
-                    itrace("ASYNC QUERY: %s wait write %ld", stmt(), timeout);
+                    itrace("[%d] ASYNC QUERY: %s wait write %ld", sock, stmt(), timeout);
                     if (waitWrite(sock)) {
-                        ierror("ASYNC QUERY: % wait write failed: %s", stmt(), errno_s);
+                        ierror("[%d] ASYNC QUERY: % wait write failed: %s", sock, stmt(), errno_s);
                         err  = true;
                         continue;
                     }
@@ -377,7 +377,7 @@ namespace suil::db {
 
                     // asynchronously wait for results
                     if (!PQconsumeInput(conn)) {
-                        ierror("ASYNC QUERY: %s failed: %s", stmt(), PQerrorMessage(conn));
+                        ierror("[%d] ASYNC QUERY: %s failed: %s", sock, stmt(), PQerrorMessage(conn));
                         err = true;
                         continue;
                     }
@@ -397,7 +397,7 @@ namespace suil::db {
                             PQclear(result);
                             break;
                         case PGRES_COMMAND_OK:
-                            itrace("ASYNC QUERY: continue waiting for results");
+                            itrace("[%d] ASYNC QUERY: continue waiting for results", sock);
                             PQclear(result);
                             break;
                         case PGRES_TUPLES_OK:
@@ -408,8 +408,8 @@ namespace suil::db {
                             break;
 
                         default:
-                            ierror("ASYNC QUERY: %s failed: %s",
-                                   stmt(), PQerrorMessage(conn));
+                            ierror("[%d] ASYNC QUERY: %s failed: %s",
+                                   sock, stmt(), PQerrorMessage(conn));
                             PQclear(result);
                             err = true;
                     }
@@ -417,12 +417,14 @@ namespace suil::db {
 
                 if (err) {
                     /* error occurred and was reported in logs */
-                    throw PgSqlException("query failed: ", PQerrorMessage(conn));
+                    throw PgSqlException("[", sock, "] query failed: ", PQerrorMessage(conn));
                 }
 
-                itrace("ASYNC QUERY: received %d results", results.results.size());
+                itrace("[%d] ASYNC QUERY: received %d results", sock, results.results.size());
             }
             else {
+                int sock = PQsocket(conn);
+
                 PGresult *result = PQexecParams(
                         conn,
                         stmt.data(),
@@ -435,13 +437,13 @@ namespace suil::db {
                 ExecStatusType status = PQresultStatus(result);
 
                 if ((status != PGRES_TUPLES_OK && status != PGRES_COMMAND_OK)) {
-                    ierror("QUERY: %s failed: %s", stmt(), PQerrorMessage(conn));
+                    ierror("[%d] QUERY: %s failed: %s", sock, stmt(), PQerrorMessage(conn));
                     PQclear(result);
                     results.fail();
                 }
                 else if ((PQntuples(result) == 0)) {
-                    idebug("QUERY: %s has zero entries: %s",
-                           stmt(), PQerrorMessage(conn));
+                    idebug("[%d] QUERY: %s has zero entries: %s",
+                           sock, stmt(), PQerrorMessage(conn));
                     PQclear(result);
                 }
                 else {
@@ -843,13 +845,21 @@ namespace suil::db {
         bool hasTable(const String& schema, const String& name);
 
         template<typename Args>
+            requires iod::IsMetaType<Args>
+        bool createTable(const String& name, Args o)
+        {
+            return createTable(name, o.Meta);
+        }
+
+        template<typename Args>
+            requires iod::is_sio<Args>::value
         bool createTable(const String& name, Args o)
         {
             Buffer qb(64);
             qb << "CREATE TABLE " << name << "(";
 
             bool first{true};
-            iod::foreach(o.Meta) | [&](const auto& m) {
+            iod::foreach(o) | [&](const auto& m) {
                 if (!first) {
                     qb << ", ";
                 }
@@ -1032,6 +1042,8 @@ namespace suil::db {
         };
 
         std::deque<conn_handle_t> conns;
+        struct UseCount {int acquire{0}, release{0}; uint32 user{0}; };
+        std::map<int, UseCount> useCount;
         bool             async{false};
         int64_t          keepAlive{-1};
         int64_t          timeout{-1};
