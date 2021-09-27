@@ -752,10 +752,13 @@ namespace suil::db {
     {
         cache_handle_t entry{it, -1};
         if (!dctor && (config.KeepAlive != 0)) {
-            mill::Lock lk{cachedMutex};
-            entry.alive = mnow() + Ego.config.KeepAlive;
-            cache.push_back(entry);
-            if (!Ego.cleaning) {
+            {
+                mill::Lock lk{cachedMutex};
+                entry.alive = mnow() + Ego.config.KeepAlive;
+                cache.push_back(entry);
+            }
+            bool expected{false};
+            if (Ego.cleaning.compare_exchange_weak(expected, true)) {
                 // schedule cleanup routine
                 go(cleanup(Ego));
             }
@@ -773,7 +776,6 @@ namespace suil::db {
     void RedisDb::cleanup(RedisDb& db)
     {
         int64_t expires = db.config.KeepAlive + 300;
-        db.cleaning = true;
 
         mill::Lock lk{db.cachedMutex};
         if (db.cache.empty()) {
