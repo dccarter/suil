@@ -554,8 +554,8 @@ namespace suil::net::smtp {
             mill::Lock lk{_mutex};
             sendQ.push_back(outgoing);
         }
-
-        if (!Ego._sending) {
+        bool expected{false};
+        if (Ego._sending.compare_exchange_weak(expected, true)) {
             go(sendOutbox(Ego));
         }
 
@@ -579,7 +579,6 @@ namespace suil::net::smtp {
 
     void SmtpOutbox::sendOutbox(SmtpOutbox& Self)
     {
-        Self._sending = true;
         while (not Self.isQueueEmpty()) {
             auto outgoing = Self.popNextQueued();
             if (outgoing->isCancelled) {

@@ -194,12 +194,12 @@ namespace suil::net::smtp {
 
         template <typename ...Params>
         void setup(String server, int port, Params... params) {
-            if (!_setup) {
+            bool expected{false};
+            if (_setup.compare_exchange_strong(expected, true)) {
                 mill::Lock lk{_mutex};
                 Ego.client.setup(std::move(server), port);
                 auto opts = iod::D(params...);
                 sendTimeout = opts.get(var(timeout), sendTimeout);
-                _setup = true;
             }
         }
 

@@ -84,7 +84,7 @@ namespace suil::db {
     PgSqlStatement PgSqlConnection::operator()(Buffer& req)
     {
         String tmp{req, false};
-        itrace("%s", tmp());
+        itrace(PRIs, _PRIs(tmp));
 
         auto it = stmtCache.find(tmp);
         if (it != stmtCache.end()) {
@@ -267,7 +267,6 @@ namespace suil::db {
     {
         /* cleanup all expired connections */
         int64_t expires = db.keepAlive + 5;
-        db.cleaning = true;
 
         mill::Lock lk{db.connsMutex};
         if (db.conns.empty())
@@ -326,7 +325,8 @@ namespace suil::db {
                 mill::Lock lk{connsMutex};
                 conns.push_back(h);
             }
-            if (!cleaning && keepAlive > 0) {
+            bool expected{false};
+            if (cleaning.compare_exchange_weak(expected, true) && keepAlive > 0) {
                 strace("scheduling cleaning...");
                 /* schedule cleanup routine */
                 go(cleanup(*this));

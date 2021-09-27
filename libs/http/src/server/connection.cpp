@@ -32,7 +32,7 @@ namespace suil::http::server {
         Status status = http::Ok;
         Request req(Ego._sock, Ego._config);
 
-        itrace("% - starting connection handler", Ego._sock.id());
+        itrace("%s - starting connection handler", Ego._sock.id());
         do {
             // receive request headers
             status = req.receiveHeaders(Ego._stats);
