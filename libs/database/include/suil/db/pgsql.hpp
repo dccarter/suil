@@ -511,6 +511,32 @@ namespace suil::db {
             results.reset();
         }
 
+        template <typename... TArgs>
+        bool operator>>(std::tuple<TArgs...>& tup) {
+            if (results.empty()) return false;
+
+            int col{0};
+            bool status{false};
+
+            iod::tuple_map(tup, [&](auto& e) {
+                using T = std::remove_cvref_t<decltype(e)>;
+                static_assert(
+                        (std::is_arithmetic_v<T> or
+                         std::is_same_v<T, String> or
+                         std::is_same_v<T, strview> or
+                         std::is_same_v<T, std::string> or
+                         std::is_same_v<T, json::Object>),
+                        "Only literal types or json::Object can be present in the tuple");
+                if (!status) {
+                    return;
+                }
+                status = results.read(e, col++);
+            });
+            results.next();
+
+            return status;
+        }
+
         bool status() {
             return !results.failed();
         }
@@ -741,12 +767,24 @@ namespace suil::db {
                 return false;
             }
 
+            bool read(std::string_view& v, int col) {
+                if (!empty()) {
+                    char *data = PQgetvalue(*it, row, col);
+                    if (data != nullptr) {
+                        int len = PQgetlength(*it, row, col);
+                        v = strview{data, size_t(len)};
+                        return true;
+                    }
+                }
+                return false;
+            }
+
             inline bool read(iod::json_string& v, int col) {
                 return Ego.read(v.str, col);
             }
 
             bool read(json::Object& obj, int col) {
-                std::string str;
+                std::string_view str;
                 if (Ego.read(str, col)) {
                     return json::trydecode(str, obj);
                 }

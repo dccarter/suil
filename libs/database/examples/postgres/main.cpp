@@ -81,6 +81,9 @@ void start()
             auto users = orm.getAll();
             verify((users.size() == 2), "2 users should have been read from database");
             uptr = reinterpret_cast<std::uintptr_t>(&conn);
+            auto results = conn("SELECT Username,Age FROM users WHERE Id=$")(0);
+            std::tuple<std::string_view,int> res;
+            results >> res;
         }
         yield();
         {
