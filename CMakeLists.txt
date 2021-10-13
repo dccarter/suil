@@ -99,7 +99,7 @@ FetchContent_Declare(
 FetchContent_Declare(
     scc
     GIT_REPOSITORY https://github.com/dccarter/scc.git
-    GIT_TAG main)
+    GIT_TAG v0.1.0)
 
 FetchContent_MakeAvailable(libmill iod scc)
 set(CMAKE_MODULE_PATH
