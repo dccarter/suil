@@ -516,7 +516,7 @@ namespace suil::db {
             if (results.empty()) return false;
 
             int col{0};
-            bool status{false};
+            bool status{true};
 
             iod::tuple_map(tup, [&](auto& e) {
                 using T = std::remove_cvref_t<decltype(e)>;
@@ -527,10 +527,7 @@ namespace suil::db {
                          std::is_same_v<T, std::string> or
                          std::is_same_v<T, json::Object>),
                         "Only literal types or json::Object can be present in the tuple");
-                if (!status) {
-                    return;
-                }
-                status = results.read(e, col++);
+                status = status && results.read(e, col++);
             });
             results.next();
 
@@ -699,7 +696,6 @@ namespace suil::db {
             bin  = 0;
             return b.release();
         }
-
 
         struct pgsql_result {
             using result_q_t = std::deque<PGresult*>;

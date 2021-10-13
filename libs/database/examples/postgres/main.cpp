@@ -81,9 +81,11 @@ void start()
             auto users = orm.getAll();
             verify((users.size() == 2), "2 users should have been read from database");
             uptr = reinterpret_cast<std::uintptr_t>(&conn);
-            auto results = conn("SELECT Username,Age FROM users WHERE Id=$")(0);
-            std::tuple<std::string_view,int> res;
-            results >> res;
+            auto results = conn("SELECT Username,Age FROM users WHERE Id=$1");
+            std::tuple<std::string_view, int> res;
+            verify((results(users[0].id) >> res), "Query should be successful and result should be decoded");
+            verify(users[0].Username == get<0>(res), "Decoding to tuple expected to be successful");
+            verify(users[0].Age == get<1>(res), "Decoding to tuple expected to be successful");
         }
         yield();
         {
