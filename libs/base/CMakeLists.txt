@@ -51,7 +51,7 @@ target_include_directories(Base PUBLIC
         $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(Base
-        PUBLIC Libmill::Libmill Iod::Iod OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid LuaS::Lua Dl::Dl Secp256k1::Secp256k1)
+        PUBLIC Libmill::Libmill Iod::Iod OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid Dl::Dl Secp256k1::Secp256k1)
 
 # Install base library
 install(TARGETS Base
@@ -72,7 +72,7 @@ if (ENABLE_UNIT_TESTS)
     include(SuilUnitTest)
     SuilUnitTest(Base-UnitTest
             SOURCES ${SUIL_BASE_SOURCES} test/main.cpp
-            LIBS Libmill::Libmill Iod::Iod OpenSSL::SSL OpenSSL::Crypto LuaS::Lua Uuid::Uuid Dl::Dl Secp256k1::Secp256k1)
+            LIBS Libmill::Libmill Iod::Iod OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid Dl::Dl Secp256k1::Secp256k1)
     target_include_directories(Base-UnitTest
             PRIVATE include)
     set_target_properties(Base-UnitTest

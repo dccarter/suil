@@ -52,6 +52,15 @@ set(CMAKE_MODULE_PATH
 
 include(cmake/SuilUtils.cmake)
 include(cmake/SuilGetOsVariant.cmake)
+include(cmake/SuilAddLibrary.cmake)
+
+if (ENABLE_UNIT_TESTS)
+    include(cmake/SuilUnitTest.cmake)
+endif()
+
+if (ENABLE_EXAMPLES)
+    include(cmake/SuilExample.cmake)
+endif()
 
 # Get OS variant
 SuilGetOsVariant(OS_VARIANT)
@@ -79,8 +88,8 @@ find_package(Threads REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(Uuid REQUIRED)
 find_package(Zmq REQUIRED)
-find_package(LuaS REQUIRED)
 find_package(Dl REQUIRED)
+find_package(LuaS REQUIRED)
 find_package(Secp256k1 REQUIRED)
 
 include(FetchContent)
@@ -116,6 +125,8 @@ endif()
 set(NAMESPACE      Suil::)
 set(TARGETS_EXPORT_NAME  ${PROJECT_NAME}Targets)
 
+add_subdirectory(libs/utils)
+add_subdirectory(libs/async)
 add_subdirectory(libs/base)
 add_subdirectory(libs/network)
 add_subdirectory(libs/database)
