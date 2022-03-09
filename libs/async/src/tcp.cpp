@@ -11,17 +11,15 @@
 #include "suil/async/tcp.hpp"
 #include "suil/async/fdwait.hpp"
 
-#include <cassert>
 #include <fcntl.h>
 #include <unistd.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 
 namespace {
 
     void tcptune(int s) noexcept
     {
-        SXY_ASSERT(s >= 0);
+        SUIL_ASSERT(s >= 0);
 
         int opt = fcntl(s, F_GETFL, 0);
         if (opt == -1) {
@@ -29,18 +27,18 @@ namespace {
         }
 
         int rc = fcntl(s, F_SETFL, opt | O_NONBLOCK);
-        SXY_ASSERT(rc != -1);
+        SUIL_ASSERT(rc != -1);
 
         //  allow re-using the same local address rapidly
         opt = 1;
         rc = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt));
-        SXY_ASSERT(rc == 0);
+        SUIL_ASSERT(rc == 0);
         // if possible, prevent SIGPIPE signal when writing to the connection
         // already closed by the peer
 #ifdef SO_NOSIGPIPE
         opt = 1;
         rc = setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof (opt));
-        SXY_ASSERT (rc == 0 || errno == EINVAL);
+        SUIL_ASSERT (rc == 0 || errno == EINVAL);
 #endif
     }
 
@@ -50,14 +48,14 @@ namespace suil {
 
     TcpSocket::TcpSocket(TcpSocket &&other) noexcept
         : Socket(std::move(other)),
-          _address{std::move(other._address)}
+          _address{other._address}
     {}
 
     TcpSocket &TcpSocket::operator=(TcpSocket &&other) noexcept
     {
         if (this != std::addressof(other)) {
             Socket::operator=(std::move(other));
-            _address = std::move(other._address);
+            _address = other._address;
         }
         return *this;
     }
@@ -74,16 +72,15 @@ namespace suil {
         int rc = ::connect(s, (struct sockaddr*) addr._data, addr.size());
 
         if (rc != 0) {
-            SXY_ASSERT(rc == -1);
+            SUIL_ASSERT(rc == -1);
             if(errno != EINPROGRESS) {
                 co_return TcpSocket{s, errno};
             }
 
-            auto fdw = co_await fdwait(s, FDW_OUT, after(timeout));
-            if(fdw == FDW_TIMEOUT || fdw == FDW_ERR) {
+            auto ev = co_await fdwait(s, Event::OUT, after(timeout));
+            if (ev != Event::esFIRED) {
                 co_return TcpSocket{s, errno};
             }
-            SXY_ASSERT(fdw == FDW_OUT);
 
             int err;
             socklen_t errsz = sizeof(err);
@@ -166,18 +163,17 @@ namespace suil {
                 break;
             }
 
-            SXY_ASSERT(as == -1);
+            SUIL_ASSERT(as == -1);
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 _error = errno;
                 break;
             }
 
-            auto rc = co_await  fdwait(_fd, FDW_IN, dd);
-            if (rc == FDW_TIMEOUT || rc == FDW_ERR) {
+            auto rc = co_await  fdwait(_fd, Event::IN, dd);
+            if (rc != Event::esFIRED) {
                 _error = errno;
                 break;
             }
-            SXY_ASSERT(rc == FDW_IN);
         }
 
         co_return sock;

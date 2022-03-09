@@ -34,7 +34,7 @@ namespace suil {
             }
         }
 
-        auto read(int fd, std::span<char> buf, std::chrono::milliseconds timeout) -> Task<int>
+        auto read(int fd, std::span<char> buf, std::chrono::milliseconds timeout) -> task<int>
         {
             if (fd < 0 || buf.data() == nullptr || buf.size() == 0) {
                 errno =  EINVAL;
@@ -48,12 +48,11 @@ namespace suil {
                 nRead = ::read(fd, buf.data(), buf.size());
                 if (nRead < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        auto res = co_await fdwait(fd, FDW_IN, deadline);
-                        if (res == FDW_TIMEOUT || res == FDW_ERR) {
+                        auto res = co_await fdwait(fd, Event::IN, deadline);
+                        if (res != Event::esFIRED) {
                             break;
                         }
 
-                        SXY_ASSERT(res == FDW_IN);
                         continue;
                     }
                 }
@@ -63,7 +62,7 @@ namespace suil {
             co_return int(nRead);
         }
 
-        auto write(int fd, const std::span<const char> &buf, std::chrono::milliseconds timeout) -> Task<int>
+        auto write(int fd, const std::span<const char> &buf, std::chrono::milliseconds timeout) -> task<int>
         {
             if (fd < 0 || buf.data() == nullptr) {
                 errno = EINVAL;
@@ -77,12 +76,11 @@ namespace suil {
                 written = ::write(fd, buf.data(), buf.size());
                 if (written < 0) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        auto res = co_await fdwait(fd, FDW_OUT, deadline);
-                        if (res == FDW_TIMEOUT || res == FDW_ERR) {
+                        auto res = co_await fdwait(fd, Event::OUT, deadline);
+                        if (res != Event::esFIRED) {
                             break;
                         }
-
-                        SXY_ASSERT(res == FDW_OUT);
+\
                         continue;
                     }
                 }

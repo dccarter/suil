@@ -19,7 +19,7 @@
 #include <experimental/coroutine>
 #endif
 
-#include <suil/base/utils.hpp>
+#include <suil/utils/utils.hpp>
 
 
 namespace std {
@@ -29,6 +29,23 @@ namespace std {
 }
 
 namespace suil {
+
+#ifdef SUIL_ASYNC_TRACE
+    struct AsyncLocation {
+        char const* file;
+        size_t line;
+    };
+#define ASYNC_LOCATION (AsyncLocation{__FILE__, __LINE__})
+#define ASYNC_TRACE(fmt, LOC, ...) printf("%s:%zu: " fmt "\n", (LOC).file, (LOC).line, ##__VA_ARGS__)
+#else
+    struct AsyncLocation {};
+    #define ASYNC_TRACE(fmt, LOC, ...)
+#endif
+#define ASYNC_TRACEn(N, fmt, LOC, ...)          \
+    if constexpr ((N) <= SUIL_ASYNC_TRACE)  {   \
+        ASYNC_TRACE(fmt, LOC, ##__VA_ARGS__);   \
+    }
+
     namespace detail {
         struct any
         {
@@ -107,4 +124,17 @@ namespace suil {
 
     template<typename T>
     constexpr bool is_awaitable_v = is_awaitable<T>::value;
+
+    inline auto now() -> std::chrono::steady_clock::time_point {
+        return std::chrono::steady_clock::now();
+    }
+
+    inline auto nowms() -> int64_t {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(now().time_since_epoch()).count();
+    }
+
+    enum {
+        PRIO_0 = 0,
+        PRIO_1 = 1
+    };
 }

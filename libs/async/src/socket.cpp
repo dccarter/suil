@@ -65,12 +65,11 @@ namespace suil {
                     break;
                 }
 
-                auto fdw = co_await fdwait(_fd, FDW_OUT, deadline);
-                if (fdw == FDW_TIMEOUT || fdw == FDW_ERR) {
-                    _error = errno;
+                auto ev = co_await fdwait(_fd, Event::OUT, deadline);
+                if (ev != Event::esFIRED) {
+                    _error = (ev ==  Event::esTIMEOUT? ETIMEDOUT : errno);
                     break;
                 }
-                SXY_ASSERT(fdw == FDW_OUT);
 
                 continue;
             }
@@ -97,13 +96,12 @@ namespace suil {
                     break;
                 }
 
-                auto fdw = co_await fdwait(_fd, FDW_OUT, deadline);
-                if (fdw == FDW_TIMEOUT || fdw == FDW_ERR) {
-                    _error = errno;
+                auto ev = co_await fdwait(_fd, Event::OUT, deadline);
+                if (ev != Event::esFIRED) {
+                    _error = (ev ==  Event::esTIMEOUT? ETIMEDOUT : errno);
                     nSent = -1;
                     break;
                 }
-                assert(fdw == FDW_OUT);
 
                 continue;
             }
@@ -134,12 +132,11 @@ namespace suil {
                     break;
                 }
 
-                auto fdw = co_await fdwait(_fd, FDW_IN, deadline);
-                if (fdw == FDW_TIMEOUT || fdw == FDW_ERR) {
-                    _error = errno;
+                auto ev = co_await fdwait(_fd, Event::IN, deadline);
+                if (ev != Event::esFIRED) {
+                    _error = (ev ==  Event::esTIMEOUT? ETIMEDOUT : errno);
                     break;
                 }
-                assert(fdw == FDW_IN);
 
                 continue;
             }
@@ -169,13 +166,12 @@ namespace suil {
                     break;
                 }
 
-                auto fdw = co_await fdwait(_fd, FDW_IN, deadline);
-                if (fdw == FDW_TIMEOUT || fdw == FDW_ERR) {
-                    _error = errno;
+                auto ev = co_await fdwait(_fd, Event::IN, deadline);
+                if (ev != Event::esFIRED) {
+                    _error = (ev ==  Event::esTIMEOUT? ETIMEDOUT : errno);
                     nReceived = -1;
                     break;
                 }
-                assert(fdw == FDW_OUT);
 
                 continue;
             }

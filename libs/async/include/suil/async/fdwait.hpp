@@ -5,7 +5,7 @@
  * under the terms of the MIT license. See LICENSE for details.
  * 
  * @author Carter
- * @date 2022-01-07
+ * @date 2022-03-06
  */
 
 #pragma once
@@ -16,62 +16,75 @@
 #include <optional>
 
 namespace suil {
-    
-    enum FDW : std::uint16_t {
-        FDW_ERR,
-        FDW_IN,
-        FDW_OUT,
-        FDW_TIMEOUT
-    };
 
-    struct FDWaitContext final {
-        int   fd{-1};
-        FDW   fdw{FDW_ERR};
-        void* waitingHandle{};
-        steady_clock::time_point   waitDeadline{};
-        std::optional<TimerHandle> waitTimer{std::nullopt};
+    struct Event {
+        typedef enum {
+            esCREATED,
+            esFIRED,
+            esERROR,
+            esSCHEDULED,
+            esABANDONED,
+            esTIMEOUT,
+        } State;
 
-        FDWaitContext() = default;
-        FDWaitContext(int fd, FDW fdw, steady_clock::time_point deadline) noexcept;
-        FDWaitContext(FDWaitContext&& o) noexcept;
-        FDWaitContext& operator=(FDWaitContext&& o) noexcept;
-        ~FDWaitContext() noexcept(false);
+        typedef enum {
+            IN,
+            OUT
+        } IO;
 
-        FDWaitContext(const FDWaitContext&) = delete;
-        FDWaitContext& operator=(const FDWaitContext&) = delete;
-
-        bool await_ready() const noexcept { return this->ready(); }
-
-        void await_suspend(std::coroutine_handle<> h) noexcept(false) {
-            this->suspend(h);
-        }
-
-        bool ready() const noexcept;
-        FDW resume() noexcept;
-        void suspend(std::coroutine_handle<> h) noexcept(false);
-    };
-
-    inline auto fdwait(int fd, FDW fdw, steady_clock::time_point deadline = {}) {
-        struct fd_awaitable {
-            FDWaitContext wait{};
-
-            fd_awaitable(int fd, FDW fdw, steady_clock::time_point deadline)
-                : wait{fd, fdw, deadline}
-            {}
-
-            bool await_ready() const noexcept {
-                return wait.ready();
-            }
-
-            void await_suspend(std::coroutine_handle<> h) noexcept(false) {
-                wait.suspend(h);
-            }
-
-            FDW await_resume() noexcept {
-                return wait.resume();
-            }
+        struct Handle {
+            int fd{INVALID_FD};
+            uint16_t affinity{0};
+            uint16_t priority{PRIO_1};
+            std::atomic<State> state{esCREATED};
+            steady_clock::time_point eventDeadline{};
+            IO  ion{IN};
+            std::optional<Timer::Handle> timerHandle{std::nullopt};
+            std::coroutine_handle<> coro{nullptr};
         };
 
-        return fd_awaitable{fd, fdw, deadline};
+        Event(int fd, uint16_t affinity = 0, uint16_t priority = PRIO_1) noexcept;
+
+        ~Event() noexcept;
+
+        MOVE_CTOR(Event) noexcept;
+
+        MOVE_ASSIGN(Event) noexcept;
+
+        DISABLE_COPY(Event);
+
+        bool await_ready() const noexcept {
+            return _handle.state == esFIRED;
+        }
+
+        void await_suspend(std::coroutine_handle<> coroutine) noexcept;
+
+        State await_resume() noexcept {
+            _handle.coro = nullptr;
+            return _handle.state.exchange(esCREATED);
+        }
+
+        Event& operator()(steady_clock::time_point dd) {
+            SUIL_ASSERT(_handle.state == esCREATED);
+            _handle.eventDeadline = dd;
+            return Ego;
+        }
+
+        Event& operator()(IO ion) {
+            SUIL_ASSERT(_handle.state == esCREATED);
+            _handle.ion = ion;
+            return Ego;
+        }
+
+    private:
+        friend class Scheduler;
+        Handle _handle{};
+    };
+
+    inline auto fdwait(int fd, Event::IO io, steady_clock::time_point dd = {})
+    {
+        Event event(fd, 0, PRIO_1);
+        event(io)(dd);
+        return event;
     }
 }

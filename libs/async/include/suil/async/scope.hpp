@@ -147,7 +147,7 @@ namespace suil {
 
         ~AsyncScope()  {
             // scope must be co_awaited before it destructs.
-            SXY_ASSERT(_continuation);
+            SUIL_ASSERT(_continuation);
         }
 
         template<typename Awaitable>

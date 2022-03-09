@@ -70,7 +70,7 @@ namespace suil {
                 FUTEX_WAKE_PRIVATE,
                 numberOfWaitersToWakeUp);
 
-        SXY_ASSERT(numberOfWaitersWokenUp != -1);
+        SUIL_ASSERT(numberOfWaitersWokenUp != -1);
     }
 
     void detail::lightweight_manual_reset_event::reset() noexcept

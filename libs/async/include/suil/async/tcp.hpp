@@ -19,6 +19,9 @@ namespace suil {
 
     class TcpSocket : public Socket {
     public:
+        TcpSocket() noexcept = default;
+        TcpSocket(int fd, int err = 0) : Socket(fd, err)
+        {}
 
         virtual ~TcpSocket() noexcept = default;
 
@@ -36,11 +39,6 @@ namespace suil {
 
         void close() noexcept override;
         int detach() override;
-
-    private:
-        TcpSocket() noexcept = default;
-        TcpSocket(int fd, int err = 0) : Socket(fd, err)
-        {}
 
         friend class TcpListener;
         SocketAddress _address{};

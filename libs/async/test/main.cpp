@@ -8,7 +8,7 @@
 #include "catch2/catch.hpp"
 #include "suil/async/poll.hpp"
 #include "suil/async/tcp.hpp"
-#include "suil/async/go.hpp"
+#include "suil/async/scope.hpp"
 
 using namespace suil;
 

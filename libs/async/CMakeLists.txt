@@ -13,7 +13,7 @@ project(Async
 
 if (LINUX)
     set(SUIL_PLATFORM_SOURCES
-            src/epoll.cpp)
+            )
 elseif(UNIX)
     set(SUIL_PLATFORM_SOURCES
             src/kqueue.cpp)
@@ -27,11 +27,12 @@ set(SUIL_ASYNC_SOURCES
         src/fdops.cpp
         src/addr.cpp
         src/mutex.cpp
-        src/poll.cpp
+        src/scheduler.cpp
         src/socket.cpp
         src/sync.cpp
         src/tcp.cpp
         src/thread.cpp
+        src/workqueue.cpp
         src/dns/dns.c)
 
 # Add and configure utils library
@@ -39,7 +40,7 @@ SuilAddLibrary(Async
         KIND STATIC
         SOURCES      ${SUIL_ASYNC_SOURCES}
         RENAME       SuilAsync
-        LIBS         Suil::Base Threads::Threads)
+        LIBS         Suil::Utils Threads::Threads)
 
 if (ENABLE_EXAMPLES)
     SuilExample(Async-TcpEchoServer

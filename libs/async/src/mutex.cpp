@@ -35,8 +35,8 @@ namespace suil {
     AsyncMutex::~AsyncMutex()
     {
         auto state = _state.load(std::memory_order_relaxed);
-        SXY_ASSERT(state == NOT_LOCKED || state == LOCKED_NO_WAITERS);
-        SXY_ASSERT(_waiters == nullptr);
+        SUIL_ASSERT(state == NOT_LOCKED || state == LOCKED_NO_WAITERS);
+        SUIL_ASSERT(_waiters == nullptr);
     }
 
     bool AsyncMutex::tryLock() noexcept
@@ -60,7 +60,7 @@ namespace suil {
 
     void AsyncMutex::unlock()
     {
-        SXY_ASSERT(_state.load(std::memory_order_relaxed) != NOT_LOCKED);
+        SUIL_ASSERT(_state.load(std::memory_order_relaxed) != NOT_LOCKED);
 
         auto waitersHeader = _waiters;
         if (_waiters == nullptr) {
@@ -74,7 +74,7 @@ namespace suil {
             }
 
             oldState = _state.exchange(LOCKED_NO_WAITERS, std::memory_order_acquire);
-            SXY_ASSERT(oldState != LOCKED_NO_WAITERS && oldState != NOT_LOCKED);
+            SUIL_ASSERT(oldState != LOCKED_NO_WAITERS && oldState != NOT_LOCKED);
 
             auto next = reinterpret_cast<AsyncMutex::lock_operation*>(oldState);
             do {
@@ -85,7 +85,7 @@ namespace suil {
             } while (next != nullptr);
         }
 
-        SXY_ASSERT(waitersHeader != nullptr);
+        SUIL_ASSERT(waitersHeader != nullptr);
         // remove the next waiting coroutine
         _waiters = waitersHeader->_next;
         // resume the waiter

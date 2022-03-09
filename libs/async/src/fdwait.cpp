@@ -5,70 +5,51 @@
  * under the terms of the MIT license. See LICENSE for details.
  * 
  * @author Carter
- * @date 2022-01-07
+ * @date 2022-03-06
  */
 
 #include "suil/async/fdwait.hpp"
-#include "suil/async/poll.hpp"
-
-#include <cerrno>
-#include <fcntl.h>
+#include "suil/async/scheduler.hpp"
 
 namespace suil {
 
-    FDWaitContext::FDWaitContext(int fd, FDW fdw, steady_clock::time_point deadline) noexcept
-        : fd{fd},
-          fdw{fdw},
-          waitDeadline{deadline}
-    {}
-
-    FDWaitContext::FDWaitContext(FDWaitContext &&o) noexcept
-        : fd{std::exchange(o.fd, -1)},
-          fdw{std::exchange(o.fdw, FDW_ERR)},
-          waitingHandle{std::exchange(o.waitingHandle, {})},
-          waitDeadline{std::exchange(o.waitDeadline, {})},
-          waitTimer{std::exchange(o.waitTimer, std::nullopt)}
-    {}
-
-    FDWaitContext& FDWaitContext::operator=(FDWaitContext &&o) noexcept
+    Event::Event(int fd, uint16_t affinity, uint16_t priority) noexcept
+            : _handle{fd, affinity, priority}
     {
-        fd = std::exchange(o.fd, -1);
-        fdw = std::exchange(o.fdw, FDW_ERR);
-        waitDeadline = std::exchange(o.waitDeadline, {});
-        waitingHandle = std::exchange(o.waitingHandle, {});
-        waitTimer = std::exchange(o.waitTimer, std::nullopt);
+        SUIL_ASSERT(fd != INVALID_FD && "Poll events needs a valid file descriptor");
+    }
+
+    Event::Event(Event &&other) noexcept
+    {
+        *this = std::move(other);
+    }
+
+    Event& Event::operator=(Event &&other) noexcept
+    {
+        if (this != &other) {
+            SUIL_ASSERT(_handle.state == esCREATED);
+            _handle.state = other._handle.state.exchange(esABANDONED);
+            _handle.affinity = std::exchange(other._handle.affinity, 0);
+            _handle.priority = std::exchange(other._handle.priority, PRIO_1);
+            _handle.fd = std::exchange(other._handle.fd, INVALID_FD);
+            _handle.eventDeadline = std::exchange(other._handle.eventDeadline, {});
+            _handle.timerHandle = std::exchange(other._handle.timerHandle, std::nullopt);
+            _handle.coro = std::exchange(other._handle.coro, nullptr);
+        }
+
         return *this;
     }
 
-    FDWaitContext::~FDWaitContext() noexcept(false)
+    Event::~Event() noexcept
     {
-        if (fd != -1) {
-            fd = -1;
-        }
+        // event must not be scheduled when it is destroyed
+        SUIL_ASSERT(_handle.state == esCREATED);
     }
 
-    bool FDWaitContext::ready() const noexcept
+    void Event::await_suspend(std::coroutine_handle<> coroutine) noexcept
     {
-        auto _fd = fd;
-        if (fcntl(_fd, F_GETFL, 0) & O_NONBLOCK)
-            return false;
-        // this should by-pass the waiting game
-        return true;
-    }
-
-    void FDWaitContext::suspend(std::coroutine_handle<void> h) noexcept(false)
-    {
-        waitingHandle = h.address();
-        Poll::tryAdd(this);
-    }
-
-    FDW FDWaitContext::resume() noexcept {
-        if (waitTimer) {
-            Poll::remove(fd);
-            waitTimer = std::nullopt;
-            errno = ETIMEDOUT;
-        }
-
-        return fdw;
+        SUIL_ASSERT(_handle.state == esCREATED);
+        _handle.coro = coroutine;
+        Scheduler::instance().schedule(this);
     }
 }

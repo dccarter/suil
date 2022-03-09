@@ -24,9 +24,9 @@
 #include <sys/un.h>
 
 namespace suil {
-    static struct dns_resolv_conf *sxy_dns_conf{nullptr};
-    static struct dns_hosts *sxy_dns_hosts{nullptr};
-    static struct dns_hints *sxy_dns_hints{nullptr};
+    static struct dns_resolv_conf *suil_dns_conf{nullptr};
+    static struct dns_hosts *suil_dns_hosts{nullptr};
+    static struct dns_hints *suil_dns_hints{nullptr};
 
     SocketAddress SocketAddress::ipv4FromLiteral(const char *addr, int port)
     {
@@ -192,11 +192,11 @@ namespace suil {
                 continue;
             switch(it->ifa_addr->sa_family) {
                 case AF_INET:
-                    SXY_ASSERT(!ipv4);
+                    SUIL_ASSERT(!ipv4);
                     ipv4 = it;
                     break;
                 case AF_INET6:
-                    SXY_ASSERT(!ipv6);
+                    SUIL_ASSERT(!ipv6);
                     ipv6 = it;
                     break;
             }
@@ -221,7 +221,7 @@ namespace suil {
                     ipv4 = nullptr;
                 break;
             default:
-                SXY_ASSERT(0);
+                SUIL_ASSERT(0);
         }
 
         if(ipv4) {
@@ -248,7 +248,7 @@ namespace suil {
         return addr;
     }
 
-    Task<SocketAddress> SocketAddress::remote(const std::string &name, int port, Mode mode, milliseconds timeout)
+    JoinableTask<SocketAddress> SocketAddress::remote(const std::string &name, int port, Mode mode, milliseconds timeout)
     {
         int rc;
         SocketAddress addr = ipFromLiteral(name.data(), port, mode);
@@ -256,27 +256,27 @@ namespace suil {
             co_return addr;
 
         /* Load DNS config files, unless they are already chached. */
-        if(unlikely(!sxy_dns_conf)) {
-            sxy_dns_conf = dns_resconf_local(&rc);
-            assert(sxy_dns_conf);
-            sxy_dns_hosts = dns_hosts_local(&rc);
-            assert(sxy_dns_hosts);
-            sxy_dns_hints = dns_hints_local(sxy_dns_conf, &rc);
-            SXY_ASSERT(sxy_dns_hints);
+        if(unlikely(!suil_dns_conf)) {
+            suil_dns_conf = dns_resconf_local(&rc);
+            assert(suil_dns_conf);
+            suil_dns_hosts = dns_hosts_local(&rc);
+            assert(suil_dns_hosts);
+            suil_dns_hints = dns_hints_local(suil_dns_conf, &rc);
+            SUIL_ASSERT(suil_dns_hints);
         }
         /* Let's do asynchronous DNS query here. */
         auto opts = dns_opts();
-        struct dns_resolver *resolver = dns_res_open(sxy_dns_conf, sxy_dns_hosts,
-                                                     sxy_dns_hints, nullptr, &opts, &rc);
-        SXY_ASSERT(resolver);
-        SXY_ASSERT(port >= 0 && port <= 0xffff);
+        struct dns_resolver *resolver = dns_res_open(suil_dns_conf, suil_dns_hosts,
+                                                     suil_dns_hints, nullptr, &opts, &rc);
+        SUIL_ASSERT(resolver);
+        SUIL_ASSERT(port >= 0 && port <= 0xffff);
         char portstr[8];
         snprintf(portstr, sizeof(portstr), "%d", port);
         struct addrinfo hints{};
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = PF_UNSPEC;
         struct dns_addrinfo *ai = dns_ai_open(name.data(), portstr, DNS_T_A, &hints, resolver, &rc);
-        SXY_ASSERT(ai);
+        SUIL_ASSERT(ai);
         dns_res_close(resolver);
 
         struct addrinfo *ipv4 = nullptr;
@@ -288,13 +288,12 @@ namespace suil {
             rc = dns_ai_nextent(&it, ai);
             if (rc == EAGAIN) {
                 int fd = dns_ai_pollfd(ai);
-                SXY_ASSERT(fd >= 0);
-                auto fdw = co_await fdwait(fd, FDW_IN, deadline);
-                if (fdw == FDW_TIMEOUT || fdw == FDW_ERR) {
+                SUIL_ASSERT(fd >= 0);
+                auto fdw = co_await fdwait(fd, Event::IN, deadline);
+                if (fdw != Event::esFIRED) {
                     co_return addr;
                 }
 
-                SXY_ASSERT(fdw == FDW_IN);
                 continue;
             }
             if (rc == ENOENT)
@@ -341,7 +340,7 @@ namespace suil {
                 }
                 break;
             default:
-                SXY_ASSERT(0);
+                SUIL_ASSERT(0);
         }
 
         if  (ipv4) {

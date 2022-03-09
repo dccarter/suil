@@ -1,42 +1,58 @@
 /**
- * Copyright (c) 2022 suilteam, Carter 
+ * Copyright (c) 2022 Suilteam, Carter Mbotho
  *
  * This library is free software; you can redistribute it and/or modify it
  * under the terms of the MIT license. See LICENSE for details.
- * 
- * @author Mpho Mbotho
- * @date 2022-01-07
+ *
+ * @author Carter
+ * @date 2022-03-06
  */
 
-
 #include "suil/async/delay.hpp"
-#include "suil/async/poll.hpp"
+#include "suil/async/scheduler.hpp"
 
 namespace suil {
 
-    Delay::Delay(std::chrono::milliseconds wait) noexcept
-        : wait{wait}
+    Timer::Timer(milliseconds timeout, uint16_t affinity, uint16_t priority)
+            : _timeout{timeout}, _affinity{uint16(affinity)}, _priority{uint16(priority)}
     {}
 
-    Delay::Delay(Delay &&o) noexcept
-        : wait{std::exchange(o.wait, 0ms)},
-          waiter{std::exchange(o.waiter, nullptr)}
-    {}
-
-    Delay &Delay::operator=(Delay &&o) noexcept
+    Timer::Timer(Timer &&other) noexcept
     {
-        wait = std::exchange(o.wait, 0ms);
-        waiter = std::exchange(o.waiter, nullptr);
-        return *this;
+        Ego = std::move(other);
     }
 
-    Delay::~Delay() noexcept(false)
-    { waiter = nullptr; }
-
-    void Delay::await_suspend(std::coroutine_handle<> h) noexcept(false)
+    Timer& Timer::operator=(Timer &&other) noexcept
     {
-        waiter = h.address();
-        Poll::addTimer(waiter, after(wait));
-        Poll::poke(Poll::POKE_NOOP);
+        if (this == &other) {
+            SUIL_ASSERT(_state == tsCREATED);
+            _state = other._state.exchange(tsABANDONED);
+            _timeout = std::exchange(other._timeout, -1ms);
+            _coro = std::exchange(other._coro, nullptr);
+            _affinity = std::exchange(other._affinity, 0);
+            _priority = std::exchange(other._priority, PRIO_1);
+        }
+
+        return Ego;
+    }
+
+    Timer::~Timer() noexcept
+    {
+        SUIL_ASSERT(_state == tsCREATED);
+    }
+
+    void Timer::await_suspend(std::coroutine_handle<> coroutine) noexcept
+    {
+        SUIL_ASSERT(_state == tsCREATED);
+        _coro = coroutine;
+        Scheduler::instance().schedule(this);
+    }
+
+    bool Timer::Entry::operator<(const Entry &rhs) const
+    {
+        return (timerDeadline < rhs.timerDeadline) ||
+               ((timerDeadline == rhs.timerDeadline) &&
+                ((targetEvent != nullptr && targetEvent != rhs.targetEvent) ||
+                 (targetTimer != nullptr && targetTimer != rhs.targetTimer)));
     }
 }

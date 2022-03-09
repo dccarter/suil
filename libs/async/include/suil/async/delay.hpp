@@ -1,67 +1,74 @@
 /**
- * Copyright (c) 2022 suilteam, Carter 
+ * Copyright (c) 2022 Suilteam, Carter Mbotho
  *
  * This library is free software; you can redistribute it and/or modify it
  * under the terms of the MIT license. See LICENSE for details.
- * 
- * @author Mpho Mbotho
- * @date 2022-01-07
+ *
+ * @author Carter
+ * @date 2022-03-06
  */
 
 #pragma once
 
 #include <suil/async/coroutine.hpp>
 
+#include <optional>
 #include <set>
 
 namespace suil {
+    struct Event;
 
-    struct Timer {
-        std::chrono::steady_clock::time_point fire{}, added{};
-        void* target{};
+    class Timer {
+    public:
+        typedef enum {
+            tsCREATED,
+            tsSCHEDULED,
+            tsABANDONED,
+            tsFIRED
+        } State;
 
-        bool operator<(const Timer& rhs) const {
-            return (fire < rhs.fire) ||
-                   (target != rhs.target && fire == rhs.fire);
-        }
+        struct Entry {
+            steady_clock::time_point timerDeadline;
+            Event *targetEvent{nullptr};
+            Timer *targetTimer{nullptr};
 
-        bool operator<=(const std::chrono::steady_clock::time_point& tp) const {
-            return fire <= tp;
-        }
+            bool operator<(const Entry& rhs) const;
+
+            bool operator<=(const std::chrono::steady_clock::time_point& tp) const {
+                return timerDeadline <= tp;
+            }
+
+        };
+        using List = std::set<Entry>;
+        using Handle = List::iterator;
+
+        Timer(milliseconds timeout, uint16_t affinity = 0, uint16_t priority = PRIO_1);
+        ~Timer() noexcept;
+
+        MOVE_CTOR(Timer) noexcept;
+        MOVE_ASSIGN(Timer) noexcept;
+
+        DISABLE_COPY(Timer);
+
+        bool await_ready() const noexcept { return _state == tsFIRED; }
+
+        void await_suspend(std::coroutine_handle<> coroutine) noexcept;
+
+        bool await_resume() noexcept { return _state.exchange(tsCREATED) == tsFIRED; }
+
+    private:
+        friend struct Scheduler;
+        std::atomic<State> _state{tsCREATED};
+        milliseconds _timeout{0ms};
+        std::coroutine_handle<> _coro{nullptr};
+        uint16_t _affinity{0};
+        uint16_t _priority{PRIO_1};
+        std::optional<Handle> _handle{};
     };
 
-    using TimerList = std::set<Timer>;
-    using TimerHandle = TimerList::iterator;
-
-    struct Delay {
-        std::chrono::milliseconds wait{};
-        void* waiter{};
-
-        Delay() = default;
-        Delay(std::chrono::milliseconds wait) noexcept;
-        Delay(Delay&& o) noexcept;
-        Delay& operator=(Delay&& o) noexcept;
-        ~Delay() noexcept(false);
-
-        Delay(const Delay&) = delete;
-        Delay& operator=(const Delay&) = delete;
-
-        bool await_ready() const noexcept { return wait.count() == 0; }
-
-        void await_suspend(std::coroutine_handle<> h) noexcept(false);
-
-        void await_resume() {}
-    };
-
-    inline auto now() -> std::chrono::steady_clock::time_point {
-        return std::chrono::steady_clock::now();
-    }
-
-    inline auto nowms() -> int64_t {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(now().time_since_epoch()).count();
-    }
-
-    inline Delay delay(std::chrono::milliseconds d) {
-        return Delay{d};
+    inline auto asyncDelay(milliseconds ms) {
+        return Timer{ms};
     }
 }
+
+#define delay(ms) do { auto ret = co_await suil::asyncDelay(ms); SUIL_ASSERT(ret); } while (0)

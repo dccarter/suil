@@ -25,6 +25,10 @@ namespace suil {
         struct scoped_lock_operation;
 
         AsyncMutex() = default;
+
+        AsyncMutex(AsyncMutex&&) = default;
+        AsyncMutex& operator=(AsyncMutex&&) = default;
+
         ~AsyncMutex();
 
         bool tryLock() noexcept;

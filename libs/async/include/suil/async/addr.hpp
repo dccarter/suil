@@ -38,13 +38,13 @@ namespace suil {
 
         static SocketAddress any(int port, Mode mode = IP_PV4);
         static SocketAddress local(const std::string& name, int port, Mode mode = IP_PV4);
-        static Task<SocketAddress> remote(
+        static JoinableTask<SocketAddress> remote(
                 const std::string& name,
                 int port,
                 Mode mode = IP_PV4,
                 milliseconds timeout = DELAY_INF);
 
-        static Task<SocketAddress> remote(
+        static JoinableTask<SocketAddress> remote(
                 const std::string& name,
                 int port,
                 milliseconds timeout)

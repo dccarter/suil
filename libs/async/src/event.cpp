@@ -63,8 +63,8 @@ namespace suil {
 
     AutoResetEvent::~AutoResetEvent()
     {
-        SXY_ASSERT(_newWaiters.load(std::memory_order_relaxed) == nullptr);
-        SXY_ASSERT(_waiters == nullptr);
+        SUIL_ASSERT(_newWaiters.load(std::memory_order_relaxed) == nullptr);
+        SUIL_ASSERT(_waiters == nullptr);
     }
 
     AutoResetEvent::auto_reset_event_operation AutoResetEvent::operator co_await() const noexcept
@@ -118,13 +118,13 @@ namespace suil {
         auto_reset_event_operation* waitersToResume{nullptr};
         auto_reset_event_operation** waitersToResumeEnd{&waitersToResume};
         std::uint32_t waitersToResumeCount = get_resumable_waiter_count(initState);
-        SXY_ASSERT(waitersToResumeCount > 0);
+        SUIL_ASSERT(waitersToResumeCount > 0);
 
         do {
             for (std::uint32_t i = 0; i < waitersToResumeCount; ++i) {
                 if (_waiters == nullptr) {
                     auto newWaiters = _newWaiters.exchange(nullptr, std::memory_order_relaxed);
-                    SXY_ASSERT(newWaiters != nullptr);
+                    SUIL_ASSERT(newWaiters != nullptr);
 
                     do {
                         auto next = newWaiters->_next;
@@ -151,7 +151,7 @@ namespace suil {
         } while (waitersToResumeCount > 0);
 
         // resume all dequeued waiters
-        SXY_ASSERT(waitersToResume != nullptr);
+        SUIL_ASSERT(waitersToResume != nullptr);
         do {
             auto* const waiter = waitersToResume;
             auto* const next = waiter->_next;
@@ -199,7 +199,7 @@ namespace suil {
 
     ManualResetEvent::~ManualResetEvent()
     {
-        SXY_ASSERT(_state.load(std::memory_order_relaxed) == nullptr ||
+        SUIL_ASSERT(_state.load(std::memory_order_relaxed) == nullptr ||
                _state.load(std::memory_order_relaxed) == static_cast<const void*>(this));
     }
 

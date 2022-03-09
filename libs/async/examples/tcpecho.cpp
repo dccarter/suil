@@ -8,9 +8,11 @@
  * @date 2022-01-14
  */
 
-#include "suil/async/poll.hpp"
+#include "suil/async/scheduler.hpp"
 #include "suil/async/tcp.hpp"
-#include "suil/async/go.hpp"
+#include "suil/async/scope.hpp"
+#include "suil/async/sync.hpp"
+#include "suil/async/fdwait.hpp"
 
 #include <cstring>
 #include <cmath>
@@ -22,15 +24,46 @@ using namespace std::string_literals;
 
 #define SYX_TCP_PORT 8080
 
+enum State {
+    EMPTY,
+    CREATED,
+    WAIT_READ,
+    WAIT_WRITE,
+    DONE
+};
+
+const char *names[] = {
+        "EMPTY",
+        "CREATED",
+        "WAIT_READ",
+        "WAIT_WRITE",
+        "DONE",
+};
+
+State states[50] = {EMPTY};
+
+void dumpStates()
+{
+    printf("states:[\n\t%s", names[states[0]]);
+    for (int i = 1; i < 20; i++) {
+        if (i % 5 == 0)
+            printf("\n""\t");
+        printf(", %s", names[states[i]]);
+    }
+    printf("\n]\n");
+}
+
+std::unordered_map<size_t, ::size_t> fairness;
+
 #ifdef SYX_TCP_ECHO_SVR
 
-auto handler(TcpSocket sock) -> Void
+auto handler(int id, TcpSocket sock) -> Task<>
 {
-    // printf("new connection: %s:%d\n", sock.address().str().c_str(), sock.address().port());
-
+    relocate_to(id%6u);
+    fairness[tid()]++;
     while (sock) {
         char buf[1024];
-        auto ec = co_await sock.receive({buf, sizeof(buf)}, 10s);
+        auto ec = co_await sock.receive({buf, sizeof(buf)});
         if (ec > 0) {
             ec = co_await sock.send({buf, std::size_t(ec)}, 10s);
         }
@@ -39,162 +72,128 @@ auto handler(TcpSocket sock) -> Void
             sock.close();
         }
         else if (ec < 0) {
-            printf("\t[%d] -> error: %s\n",
-                   sock.address().port(),
-                   strerror(sock.getLastError()));
+            std::printf("\t[%d] -> error: %s\n", sock.address().port(), strerror(sock.getLastError()));
             sock.close();
         }
     }
 }
-
-auto acceptor(int id, TcpListener& listener) -> AsyncVoid
+void _dumpFairness()
 {
+    auto f = std::move(fairness);
+    for (auto& [t, n] : f) {
+        printf("[%022zu] %zu\n", t, n);
+    }
+}
 
+auto dumpFairness() -> Task<>
+{
+    while (true) {
+        delay(20s);
+        _dumpFairness();
+    }
+}
+
+auto acceptor(TcpListener& listener) -> VoidTask<true>
+{
     AsyncScope connectionScope;
+    connectionScope.spawn(dumpFairness());
+
+    int i = 0;
     while (listener) {
         auto sock = co_await listener.accept();
         if (!sock) {
             printf("accept failed: %s\n", strerror(errno));
             break;
         }
-        connectionScope.spawn(handler(std::move(sock)));
+
+        connectionScope.spawn(handler(i++, std::move(sock)));
     }
 
     // join the open utils scope
     co_await connectionScope.join();
-
-    // Poke the poll loop to stop polling (this will immediately exit the application)
-    Poll::poke(Poll::POKE_STOP);
 }
 
-void multiThreadServer(int tc)
+void multiThreadServer()
 {
     auto listener = TcpListener::listen(SocketAddress::local("0.0.0.0", SYX_TCP_PORT), 127);
-    SXY_ASSERT(listener);
+    SUIL_ASSERT(listener);
     printf("listening on 0.0.0.0:%d\n", SYX_TCP_PORT);
-
-    std::thread ts[tc];
-    for (int i = 1; i < tc; i++) {
-        ts[i] = std::thread([i, ls = &listener] {
-            // Start an acceptor
-            auto accept = acceptor(i, *ls);
-            // Enter event loop, waking up every 5 seconds if there are no events to handle
-            Poll::loop(5s);
-        });
-    }
-
-    {
-        // Start an acceptor
-        auto accept = acceptor(0, listener);
-        // Enter event loop, waking up every 5 seconds if there are no events to handle
-        Poll::loop(5s);
-    }
-
-    for (int i = 1; i < tc; i++) {
-        if (ts[i].joinable())
-            ts[i].join();
-    }
+    auto ac = acceptor(listener);
+    ac.join();
 }
 
 #else
-auto connection(int id, long roundTrips) -> Void
+auto connection(int id, long roundTrips) -> Task<>
 {
+    relocate_to(id%6u);
+    fairness[tid()]++;
     auto conn = co_await TcpSocket::connect(SocketAddress::local("0.0.0.0", SYX_TCP_PORT));
-    // printf("%d: connected to server\n", id);
-    SXY_ASSERT(conn);
+    SUIL_ASSERT(conn);
 
 #define MESSAGE     "Hello World"
 #define MESSAGE_LEN (sizeof(MESSAGE)-1)
 
     for (int i = 0; i < roundTrips; ++i) {
-        auto ec = co_await conn.send({MESSAGE, MESSAGE_LEN});
-        SXY_ASSERT(ec == MESSAGE_LEN);
+        auto ec = co_await conn.send({MESSAGE, MESSAGE_LEN}, 10s);
+        SUIL_ASSERT(ec == MESSAGE_LEN);
         char buf[16];
-        ec = co_await conn.receive({buf, sizeof(buf)});
-        SXY_ASSERT(ec == MESSAGE_LEN);
+        ec = co_await conn.receive({buf, sizeof(buf)}, 10s);
+        if (ec != MESSAGE_LEN) {
+            break;
+        }
     }
-
 #undef MESSAGE
 #undef MESSAGE_LEN
 
 }
 
-auto client(std::int64_t& duration, long conns, long roundTrips) -> AsyncVoid
+auto clients(long conns, long roundTrips) -> VoidTask<>
 {
     AsyncScope connectionsScope;
-    printf("starting %ld round trips for %ld connections\n", roundTrips, conns);
 
-    auto start = nowms();
     for (int i = 0; i < conns; ++i) {
         connectionsScope.spawn(connection(i, roundTrips));
     }
 
     co_await connectionsScope.join();
-    duration = nowms() - start;
-
-    // Poke the poll loop to stop polling (this will immediately exit the application)
-    Poll::poke(Poll::POKE_STOP);
 }
 
-void multiThreadedClients(int tc, long conns, long roundTrips)
+void multiThreadedClients(long conns, long roundTrips)
 {
-    std::thread ts[tc];
-    std::int64_t durations[tc];
-    for (int i = 1; i < tc; i++) {
-        durations[i] = 0;
-        ts[i] = std::thread([i, conns, roundTrips, d = &durations[i]] {
-            auto connector = client(*d, conns, roundTrips);
-            Poll::loop(5s);
-        });
-    }
+    auto start = nowms();
 
-    {
-        auto connector = client(durations[0], conns, roundTrips);
-        Poll::loop(5s);
-    }
+    auto handle = clients(conns, roundTrips);
+    handle.join();
 
-    double duration = double(durations[0]);
-    for (int i = 1; i < tc; i++) {
-        if (ts[i].joinable())
-            ts[i].join();
-        duration += double(durations[i]);
-    }
+    auto duration = nowms() - start;
 
-    duration /= tc;
-    auto requests = tc * conns * roundTrips;
-    printf("%ld requests in %.3f ms\n",  requests, duration);
+    auto requests = conns * roundTrips;
+    for (auto [t, n] : fairness) {
+        printf("[%022zu] %zu\n", t, n);
+    }
+    printf("%ld requests in %ld ms\n",  requests, duration);
     printf("Performance: %.2f req/s\n", double(requests * 1000)/double(duration));
 }
 
 #endif
 
-
 int main(int argc, const char *argv[])
 {
+    Scheduler::init();
 #ifdef SYX_TCP_ECHO_SVR
-    constexpr const char* usage = "Usage: syx-tcp-echo-svr [threads:1]\n";
-    int tc{1};
-    if (argc >= 2) {
-        tc = int(strtol(argv[1], nullptr, 10));
-        SXY_ASSERT(tc != 0);
-    }
-    multiThreadServer(tc);
+    multiThreadServer();
 #else
-    constexpr const char* usage = "Usage: syx-tcp-echo-cli <conns> <roundtrips> <threads>\n";
+    constexpr const char* usage = "Usage: syx-tcp-echo-cli <conns> <roundtrips>\n";
     if (argc < 3) {
         printf(usage);
         return EXIT_FAILURE;
     }
 
     auto conns = strtol(argv[1], nullptr, 10);
-    SXY_ASSERT(conns != 0);
+    SUIL_ASSERT(conns != 0);
     auto roundTrips = strtol(argv[2], nullptr, 10);
-    int tc{1};
-    if (argc >= 4) {
-        tc = int(strtol(argv[3], nullptr, 10));
-        SXY_ASSERT(tc != 0);
-    }
-    multiThreadedClients(tc, conns, roundTrips);
+    multiThreadedClients(conns, roundTrips);
 #endif
+    Scheduler::abort();
     return EXIT_SUCCESS;
 }
