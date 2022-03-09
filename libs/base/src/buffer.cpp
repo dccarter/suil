@@ -4,9 +4,10 @@
 
 
 #include "suil/base/buffer.hpp"
-#include "suil/base/exception.hpp"
 #include "suil/base/datetime.hpp"
 #include "suil/base/string.hpp"
+
+#include <suil/utils/exception.hpp>
 
 #include <algorithm>
 #include <cstdarg>
@@ -324,7 +325,7 @@ TEST_CASE("sb::Buffer tests", "[common][buffer]")
             ob.clear();
 
             const char *cstr{"Hello World"};
-            sb::strview svstr{cstr, strlen(cstr)};
+            sb::std::string_view svstr{cstr, strlen(cstr)};
             std::string str(cstr);
 
             ssize_t from{ob.m_offset};
@@ -428,7 +429,7 @@ TEST_CASE("sb::Buffer tests", "[common][buffer]")
         testStreamOperator(ob,  1.3e-2,                  "0.013000");
         testStreamOperator(ob,  "Hello",                 "Hello");
         testStreamOperator(ob,  str,                     "Hello World");
-        testStreamOperator(ob,  sb::strview(str),            "Hello World");
+        testStreamOperator(ob,  sb::std::string_view(str),            "Hello World");
         testStreamOperator(ob,  true,                    "true");
         testStreamOperator(ob,  std::move(other),        "Hello World");
         testStreamOperator(ob,  sb::fmtbool(true),           "True");
@@ -445,7 +446,7 @@ TEST_CASE("sb::Buffer tests", "[common][buffer]")
         };
 
         testAddOperator(ob,  str,                 "Hello World");
-        testAddOperator(ob,  sb::strview{str},        "Hello World");
+        testAddOperator(ob,  sb::std::string_view{str},        "Hello World");
         testAddOperator(ob,  "Hello world again", "Hello world again");
 
     }
@@ -585,7 +586,7 @@ TEST_CASE("sb::Buffer tests", "[common][buffer]")
 
             ob.reset(16, true);
             ob << "Hello World";
-            auto sv = sb::strview(ob);
+            auto sv = sb::std::string_view(ob);
             REQUIRE(Check(ob, 0, &sv[0], sv.size()));
             auto str = std::string(ob);
             REQUIRE(Check(ob, 0, &str[0], str.size()));

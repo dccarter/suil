@@ -5,13 +5,14 @@
 #ifndef SUIL_BASE_JSON_HPP
 #define SUIL_BASE_JSON_HPP
 
-#include "suil/base/exception.hpp"
-#include "suil/base/utils.hpp"
+#include "suil/utils/utils.hpp"
 #include "suil/base/string.hpp"
 #include "suil/base/buffer.hpp"
 #include "suil/base/blob.hpp"
 #include "suil/base/logging.hpp"
 #include "suil/base/meta.hpp"
+
+#include <suil/utils/exception.hpp>
 
 #include <iod/json.hh>
 

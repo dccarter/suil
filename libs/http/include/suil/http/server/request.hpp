@@ -28,7 +28,7 @@ namespace suil::http::server {
         const char *ip() const;
         int port() const;
         net::Socket& sock();
-        strview body() const;
+        std::string_view body() const;
         size_t readBody(void *buf, size_t len);
         bool isValid() const;
         const String& header(const String& name) const;

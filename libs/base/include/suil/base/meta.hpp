@@ -5,7 +5,7 @@
 #ifndef SUILBASE_META_HPP
 #define SUILBASE_META_HPP
 
-#include "suil/base/exception.hpp"
+#include <suil/utils/exception.hpp>
 
 namespace suil {
 

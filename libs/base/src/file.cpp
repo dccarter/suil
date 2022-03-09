@@ -5,9 +5,13 @@
 #include "suil/base/file.hpp"
 #include "suil/base/datetime.hpp"
 
+#include <suil/async/fdops.hpp>
+
 #include <dirent.h>
 #include <libgen.h>
-#include <limits.h>
+#include <sys/stat.h>
+
+#include <climits>
 
 namespace {
 
@@ -112,108 +116,118 @@ namespace {
 
 namespace suil {
 
-    File::File(mfile fd)
-        : fd(fd)
+    File::File(int fd, bool own)
+        : _fd(fd), _own{own}
     {}
 
-    File::File(int fd, bool own)
-            : fd(mfcreate(fd, own))
-    {
-        if (Ego.fd == nullptr) {
-            throw AccessViolation("creating file for descriptor '", fd, "' failed: ", errno_s);
-        }
-    }
-
     File::File(const String& name, int flags, mode_t mode)
-            : File(mfopen(name(), flags, mode))
+        : File()
     {
-        if (fd == nullptr) {
-            throw AccessViolation("opening file '", name(), "' failed: ", errno_s);
+
+        if (!open(name, flags, mode)) {
+            throw fs::FileIOException("opening file '", name(), "' failed: ", errno_s);
         }
     }
 
     bool File::open(const String& path, int flags, mode_t mode)
     {
-        if (fd != nullptr) {
+        if (_fd != INVALID_FD) {
             errno = EINPROGRESS;
             return false;
         }
 
-        return (Ego.fd = mfopen(path(), flags, mode)) != nullptr;
+        Ego._fd = ::open(path(), flags, mode);
+        if (Ego._fd != INVALID_FD) {
+            if (!nonblocking(_fd, true)) {
+                auto err = errno;
+                ::close(_fd);
+                _fd = INVALID_FD;
+                errno = err;
+                return false;
+            }
+            _own = true;
+            return true;
+        }
+
+        return false;
     }
 
     void File::close() {
-        if (fd != nullptr) {
-            flush(500);
-            mfclose(fd);
-            fd = nullptr;
+        if (_fd != INVALID_FD and _own) {
+            ::close(_fd);
         }
-    }
-
-    void File::flush(const Deadline& dd)
-    {
-        if (fd == nullptr) {
-            // invalid call context
-            throw AccessViolation("File::flush - unsupported call context");
-        }
-
-        mfflush(fd, dd);
-        if (errno) {
-            printf("flushing failed: %s", errno_s);
-        }
+        _own = false;
+        _fd = INVALID_FD;
     }
 
     off_t File::seek(off_t off) {
-        if (fd == nullptr) {
+        if (_fd == INVALID_FD) {
             // invalid call context
-            throw AccessViolation("File::seek - unsupported call context");
+            throw fs::FileIOException("File::seek - unsupported call context");
         }
-        return mfseek(fd, off);
+        return lseek(_fd, off, SEEK_SET);
     }
 
     bool File::eof() {
-        if (fd == nullptr) {
+        if (_fd == INVALID_FD) {
             // invalid call context
-            throw AccessViolation("File::eof - unsupported call context");
+            throw fs::FileIOException("File::eof - unsupported call context");
         }
-        return mfeof(fd) != 0;
+
+        auto current = lseek(_fd, 0, SEEK_CUR);
+        if (current == -1) {
+            return current;
+        }
+
+        auto eof = lseek(_fd, 0, SEEK_END);
+        if (eof == -1) {
+            return eof;
+        }
+
+        auto res = lseek(_fd, current, SEEK_SET);
+        if (res == -1) {
+            return res;
+        }
+        return (current == eof);
+
     }
 
     off_t File::tell() {
-        if (fd == nullptr) {
+        if (_fd == INVALID_FD) {
             // invalid call context
-            throw AccessViolation("File::tell - unsupported call context");
+            throw fs::FileIOException("File::tell - unsupported call context");
         }
-        return mftell(fd);
+        return lseek(_fd, 0, SEEK_CUR);
     }
 
-    bool File::read(
+    task<bool> File::read(
             void *buf,
             size_t &len,
-            const Deadline& dd)
+            milliseconds timeout)
     {
         bool status{true};
-        if (fd == nullptr) {
+        if (_fd == INVALID_FD) {
             // invalid call context
-            throw AccessViolation("File::read - unsupported call context");
+            throw fs::FileIOException("File::read - unsupported call context");
         }
-        size_t ret = mfread(fd, buf, len, dd);
-        if (errno) {
-            strace("%p: File read error: %s", fd, errno_s);
+
+        auto ret = co_await fdops::read(_fd, {(char *)buf, len}, timeout);
+        if (ret < 0) {
+            strace("%p: File read error: %s", _fd, errno_s);
             status = false;
         }
         len = ret;
-        return status;
+        co_return status;
     }
 
-    Status<String> File::readLine(const Deadline& dd)
+    task<Status<String>> File::readLine(milliseconds timeout)
     {
         Buffer ob{256};
         while (true) {
             ob.reserve(1);
-            size_t ret  = mfread(fd, &ob.data()[ob.size()], 1, dd);
+            auto ret  = co_await fdops::read(_fd, {&ob.data()[ob.size()], 1}, timeout);
             if (errno) {
-                return {errno};
+                co_return Status<String>{errno};
             }
             if (ob.data()[ob.size()] == '\n') {
                 break;
@@ -221,59 +235,26 @@ namespace suil {
             ob.seek(1);
         }
 
-        return Ok(String{ob});
+        co_return Ok(String{ob});
     }
 
 
-    size_t File::write(
+    task<size_t> File::write(
             const void *buf,
             size_t len,
-            const Deadline& dd)
+            milliseconds timeout)
     {
-        if (fd == nullptr) {
+        if (_fd == INVALID_FD) {
             // invalid call context
-            throw AccessViolation("File::write - unsupported call context");
+            throw fs::FileIOException("File::write - unsupported call context");
         }
-        size_t ret = mfwrite(fd, buf, len, dd);
+
+        auto ret = co_await fdops::write(_fd, {(const char*)buf, len}, timeout);
         if (errno) {
-            strace("%p: File write error: %s", fd, errno_s);
+            strace("%p: File write error: %s", _fd, errno_s);
         }
-        return ret;
-    }
 
-    File& File::operator<<(const char* str) {
-        if (str) {
-            size_t len = strlen(str);
-            size_t nwr = write(str, len, -1);
-            if (nwr != len) {
-                throw fs::FileIOException("Writing failed to file failed");
-            }
-        }
-        return Ego;
-    }
-
-    File& File::operator<<(const Buffer& b) {
-        size_t nwr = write(b.data(), b.size(), -1);
-        if (nwr != b.size()) {
-            throw fs::FileIOException("Writing failed to file failed");
-        }
-        return Ego;
-    }
-
-    File& File::operator<<(const String& str) {
-        size_t nwr = write(str.data(), str.size(), -1);
-        if (nwr != str.size()) {
-            throw fs::FileIOException("Writing failed to file failed");
-        }
-        return Ego;
-    }
-
-    File& File::operator<<(strview& sv) {
-        size_t nwr = write(sv.data(), sv.size(), -1);
-        if (nwr != sv.size()) {
-            throw fs::FileIOException("Writing failed to file failed");
-        }
-        return Ego;
+        co_return size_t(ret);
     }
 
     File::~File() {
@@ -281,7 +262,6 @@ namespace suil {
     }
 
     FileLogger::FileLogger(const String& dir, const String& prefix)
-        : dst(nullptr)
     {
         open(dir, prefix);
     }
@@ -292,15 +272,19 @@ namespace suil {
             fs::mkdir(dir.c_str(), true, 0777);
         }
         String tmp{suil::catstr(dir, "/", prefix, "-", Datetime()("%Y%m%d_%H%M%S"), ".log")};
-        dst = std::move(File(tmp.data(), O_WRONLY|O_APPEND|O_CREAT, 0666));
+        _fd = ::open(tmp(), O_WRONLY|O_APPEND|O_CREAT, 0666);
+        if (_fd == INVALID_FD) {
+            throw fs::FileIOException("creating log file: '", tmp, "' failed: ", errno_s);
+        }
     }
 
     void FileLogger::write(const char *data, size_t sz, Level l, const char *tag)
     {
-        if (dst.valid()) {
-            dst.write(data, sz, 1500);
-            dst.flush(1500);
+        if (_fd == INVALID_FD) {
+            return;
         }
+
+        ::write(_fd, data, sz);
     }
 
 
@@ -459,33 +443,33 @@ namespace suil {
         out.seek(nread);
     }
 
-    void fs::append(const char *path, const void *data, size_t sz, bool async) {
+    AsyncVoid fs::append(const char *path, const void *data, size_t sz, bool async) {
         File f(path, O_WRONLY|O_CREAT|O_APPEND, 0666);
-        f.write(data, sz, 1500);
+        co_await f.write(data, sz, 1500ms);
         f.close();
     }
 
-    bool fs::read(const char *path, void *data, size_t sz, bool async) {
+    task<bool> fs::read(const char *path, void *data, size_t sz, bool async) {
         if (!fs::exists(path)) {
-            return false;
+            co_return false;
         }
 
         File f(path, O_RDONLY|O_CREAT, 0666);
-        return f.read(data, sz, 1500);
+        co_return co_await f.read(data, sz, 1500ms);
     }
 
     String fs::realpath(const char *path) {
         char base[PATH_MAX];
         if (::realpath(path, base) == nullptr) {
             if (errno != EACCES && errno != ENOENT)
-                return String();
+                return {};
         }
 
         return std::move(String{base}.dup());
     }
 
     size_t fs::size(const char *path) {
-        struct stat st;
+        struct stat st{};
         if (stat(path, &st) == 0) {
             return (size_t) st.st_size;
         }

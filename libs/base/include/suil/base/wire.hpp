@@ -8,8 +8,10 @@
 #include "suil/base/varint.hpp"
 #include "suil/base/blob.hpp"
 #include "suil/base/symbols.hpp"
-#include "suil/base/exception.hpp"
 #include "suil/base/sio.hpp"
+
+#include <suil/utils/exception.hpp>
+
 #include <iod/symbol.hh>
 
 namespace suil {

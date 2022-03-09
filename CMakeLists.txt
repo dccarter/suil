@@ -13,8 +13,8 @@ if (NOT CMAKE_BUILD_TYPE)
     # default build type is Debug
     set(CMAKE_BUILD_TYPE Debug)
 endif()
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -Werror")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Werror")
 
 # Postfix all debug libraries with -dbg
 #set(CMAKE_DEBUG_POSTFIX "-dbg")
@@ -26,6 +26,7 @@ option(DEVEL_IDE            "When enabled, it will suppress some cmake errors" O
 
 set(SUIL_ENABLE_BACKTRACE  1 CACHE STRING "Enable/Disable backtrace in builds")
 set(SUIL_ENABLE_TRACE  1 CACHE STRING "Enable trace logs in debug builds (Debug only option)")
+set(SUIL_ASYNC_TRACE  ${SUIL_ENABLE_TRACE} CACHE STRING "Enable tracing coroutine scheduler on console")
 set(SUIL_BUILD_NUMBER  0 CACHE STRING "Build number version")
 set(SUIL_BUILD_TAG     devel CACHE STRING "Version tag string")
 set(SUIL_SOFTWARE_NAME suil  CACHE STRING "The name of the server")

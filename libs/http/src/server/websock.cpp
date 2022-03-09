@@ -21,7 +21,7 @@
 namespace {
     uint8_t sApiIndex{0};
     std::unordered_map<uint8_t, suil::http::WebSockApi&> sApis{};
-    const suil::strview WsServerResponse{"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"};
+    const suil::std::string_view WsServerResponse{"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"};
 }
 
 namespace suil::http {
@@ -115,7 +115,7 @@ namespace suil::http {
             size_t size,
             WebSockCreated onSockCreated)
     {
-        strview  key{}, version{};
+        std::string_view  key{}, version{};
 
         key = req.header("Sec-WebSocket-Key");
         if (key.empty()) {

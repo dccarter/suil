@@ -5,10 +5,13 @@
 #ifndef SUIL_BASE_NOTIFY_HPP
 #define SUIL_BASE_NOTIFY_HPP
 
-#include <suil/base/channel.hpp>
 #include <suil/base/logging.hpp>
 #include <suil/base/signal.hpp>
 #include <suil/base/string.hpp>
+
+#include <suil/utils/exception.hpp>
+#include <suil/async/event.hpp>
+#include <suil/async/scope.hpp>
 
 #include <map>
 #include <sys/inotify.h>
@@ -65,36 +68,40 @@ namespace suil::fs {
 
         static Watcher::UPtr create();
 
-        int watch(
+        task<int> watch(
                 const String& path,
                 uint32 events,
                 Notifier::Func cb,
                 uint32 mode = WatchMode::ExcludeLinks | WatchMode::MaskCreate);
 
-        int watch(
+        task<int> watch(
                 const String& path,
                 uint32 events,
                 uint32 mode = WatchMode::ExcludeLinks | WatchMode::MaskCreate);
 
         void unwatch(int wd);
 
+        void close();
+
         Notifier& operator[](int wd);
 
         Signal<void()> onEventQueueOverflow;
+
+        auto operator co_await() { return _waiterScope.join(); }
 
         ~Watcher();
 
     private:
         Watcher(int fd);
-        static void waitForEvents(Watcher& S);
+        static AsyncVoid waitForEvents(Watcher& S);
         void handleEvents(const char* events, size_t len);
         DISABLE_COPY(Watcher);
         DISABLE_MOVE(Watcher);
-        int _fd{-1};
-        using Signals = std::map<int, Notifier>;
+        int _fd{INVALID_FD};
+        using Signals = std::map<int, std::unique_ptr<Notifier>>;
         Signals _signals{};
         std::atomic_bool _watching{false};
-        mill::Event _cond{};
+        AsyncScope _waiterScope{};
     };
 }
 #endif //SUIL_BASE_NOTIFY_HPP

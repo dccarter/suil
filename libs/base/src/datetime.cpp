@@ -13,7 +13,7 @@ namespace suil {
     }
 
     Datetime::Datetime()
-            : Datetime(time(nullptr))
+        : Datetime(time(nullptr))
     {}
 
     Datetime::Datetime(const char *fmt, const char *str)

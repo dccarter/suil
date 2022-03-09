@@ -5,7 +5,7 @@
 #ifndef SUIL_NET_CHUNK_HPP
 #define SUIL_NET_CHUNK_HPP
 
-#include <suil/base/utils.hpp>
+#include <suil/utils/utils.hpp>
 
 #include <memory>
 

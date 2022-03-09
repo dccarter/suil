@@ -3,20 +3,22 @@
 //
 
 #include "suil/base/syson.hpp"
+#include "suil/base/logging.hpp"
 
-#include <suil/base/exception.hpp>
-#include <suil/base/logging.hpp>
+#include <suil/utils/exception.hpp>
+#include <suil/async/scope.hpp>
+
 
 namespace suil {
 
     using SType = Signal<void(int sig, siginfo_t *info, void *context)>;
 
-    static std::unordered_map<Signals, SType> s_SignalMap;
+    static std::unordered_map<Signals, std::unique_ptr<SType>> s_SignalMap;
 
-    static void invokeSignalHandler(SType& S, int sig, siginfo_t *info, void *ctx)
+    void ON::invokeSignalHandler(SType& S, int sig, siginfo_t *info, void *ctx)
     {
         try {
-            S(sig, info, ctx);
+            ON::instance()._scope.spawn(S(sig, info, ctx));
         }
         catch (...) {
             scritical("signal{%d} handler error: %s",
@@ -24,7 +26,7 @@ namespace suil {
         }
     }
 
-    static void signalActionHandler(int sig, siginfo_t *info, void *ctx)
+    void ON::signalActionHandler(int sig, siginfo_t *info, void *ctx)
     {
         static std::atomic_bool s_Exiting{false};
         if (s_Exiting) {
@@ -44,13 +46,13 @@ namespace suil {
 
         auto it = s_SignalMap.find(Signals(sig));
         if (it != s_SignalMap.end()) {
-            invokeSignalHandler(it->second, sig, info, ctx);
+            invokeSignalHandler(*it->second, sig, info, ctx);
         }
 
         exit(EXIT_SUCCESS);
     }
 
-    SType& On(Signals sig)
+    SType& ON::On(Signals sig)
     {
         if (!s_SignalMap.contains(sig)) {
             struct sigaction sa{nullptr};
@@ -59,26 +61,34 @@ namespace suil {
             if (sigaction(int(sig), &sa, nullptr) == -1) {
                 serror("sigaction failed: %s", errno_s);
             }
-            s_SignalMap[sig] = SType{};
+            s_SignalMap[sig] = std::make_unique<SType>();
         }
 
-        return s_SignalMap[sig];
+        return *s_SignalMap[sig];
     }
 
-    static void batchOn(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void *)> func)
+    static AsyncVoid batchOn(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void *)> func)
     {
         for (auto sig: sigs) {
-            On(sig) += func;
+            co_await (ON::instance().On(sig) += func);
         }
     }
 
-    void On(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void *)> func)
+    AsyncVoid ON::operator()(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void *)> func)
     {
-        batchOn(sigs, func);
+        return batchOn(sigs, std::move(func));
     }
 
-    void On(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void*)> func, Once& once)
+    AsyncVoid ON::operator()(const std::vector<Signals>& sigs,
+                            std::function<void(int, siginfo_t*, void *)> func,
+                            Once& once)
     {
-        std::call_once(once, batchOn, sigs, func);
+        return batchOn(sigs, std::move(func));
+    }
+
+    ON& ON::instance() noexcept
+    {
+        static ON s_ON;
+        return s_ON;
     }
 }

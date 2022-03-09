@@ -7,7 +7,6 @@ project(SuilBase VERSION ${SUIL_BASE_VERSION} LANGUAGES C CXX)
 set(SUIL_BASE_SOURCES
         src/base64.cpp
         src/buffer.cpp
-        src/channel.cpp
         src/args.cpp
         src/console.cpp
         src/crypto.cpp
@@ -15,7 +14,6 @@ set(SUIL_BASE_SOURCES
         src/datetime.cpp
         src/encryption.cpp
         src/env.cpp
-        src/exception.cpp
         src/file.cpp
         src/hash.cpp
         src/json.cpp
@@ -31,7 +29,6 @@ set(SUIL_BASE_SOURCES
         src/string.cpp
         src/syson.cpp
         src/units.cpp
-        src/utils.cpp
         src/url.cpp
         src/uuid.cpp
         src/union.cpp
@@ -39,30 +36,12 @@ set(SUIL_BASE_SOURCES
         src/wire.cpp)
 
 # Base library
-add_library(Base STATIC
-        ${SUIL_BASE_SOURCES})
-add_library(Suil::Base ALIAS Base)
-set_target_properties(Base
-    PROPERTIES
-        OUTPUT_NAME SuilBase)
+SuilAddLibrary(Base
+        KIND STATIC
+        SOURCES      ${SUIL_BASE_SOURCES}
+        RENAME       SuilBase
+        LIBS         Suil::Async Iod::Iod OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid Dl::Dl Secp256k1::Secp256k1)
 
-target_include_directories(Base PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>)
-
-target_link_libraries(Base
-        PUBLIC Libmill::Libmill Iod::Iod OpenSSL::SSL OpenSSL::Crypto Uuid::Uuid Dl::Dl Secp256k1::Secp256k1)
-
-# Install base library
-install(TARGETS Base
-        EXPORT  ${TARGETS_EXPORT_NAME}
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
-
-# Install includes library
-install(DIRECTORY include/suil/base/
-        DESTINATION include/suil/base
-        FILES_MATCHING PATTERN "*.hpp")
 
 include(generator/.cmake)
 include(examples/.cmake)

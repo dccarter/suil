@@ -5,7 +5,10 @@
 #pragma once
 
 #include <suil/base/string.hpp>
-#include <suil/base/exception.hpp>
+
+#include <suil/utils/exception.hpp>
+
+#include <suil/async/task.hpp>
 
 namespace suil::args {
 
@@ -90,8 +93,8 @@ namespace suil::args {
         Command& operator()(Handler handler);
         Command  operator()() { return std::move(Ego); }
         void showHelp(String app, Buffer& help, bool isHelp = false) const;
-        bool parse(int argc, char *argv[], bool debug = false);
-        bool parse(Arguments& arguments, bool debug = false) {
+        task<bool> parse(int argc, char *argv[], bool debug = false);
+        task<bool> parse(Arguments& arguments, bool debug = false) {
             return parse(arguments.Argc, arguments.Argv, debug);
         }
 
@@ -165,7 +168,7 @@ namespace suil::args {
             }
         }
 
-        void requestValue(Arg& arg);
+        AsyncVoid requestValue(Arg& arg);
         Arg& check(const String& lf, char sf);
         bool check(Arg*& found, const String& lf, char sf);
 
@@ -194,8 +197,8 @@ namespace suil::args {
             return Ego;
         }
 
-        void  parse(int argc, char *argv[]);
-        void  parse(Arguments& arguments) { parse(arguments.Argc, arguments.Argv); }
+        AsyncVoid parse(int argc, char *argv[]);
+        AsyncVoid parse(Arguments& arguments) { return parse(arguments.Argc, arguments.Argv); }
         void  handle();
         void  getCommandHelp(Buffer& out, Command& cmd, bool isHelp);
         const Command* getCommand() const {
@@ -265,6 +268,6 @@ namespace suil::args {
         bool      mInter{false};
     };
 
-    Status<String> readParam(const String& display, const String& def);
+    task<Status<String>> readParam(const String& display, const String& def);
     Status<String> readPasswd(const String& display);
 }

@@ -5,7 +5,7 @@
 #ifndef SUIL_NETWORK_ZMQ_CONTEXT_HPP
 #define SUIL_NETWORK_ZMQ_CONTEXT_HPP
 
-#include <suil/base/utils.hpp>
+#include <suil/utils/utils.hpp>
 
 namespace suil::net::zmq {
 

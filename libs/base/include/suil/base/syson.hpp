@@ -6,6 +6,8 @@
 
 #include <suil/base/signal.hpp>
 
+#include <suil/async/scope.hpp>
+
 #include <csignal>
 #include <mutex>
 
@@ -43,7 +45,32 @@ namespace suil {
     };
 
     using Once = std::once_flag;
-    Signal<void(int, siginfo_t*, void*)>& On(Signals sig);
-    void On(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void*)> func);
-    void On(const std::vector<Signals>& sigs, std::function<void(int, siginfo_t*, void*)> func, Once& once);
+
+    struct ON {
+        Signal<void(int, siginfo_t*, void*)>& On(Signals sig);
+
+        AsyncVoid operator()(const std::vector<Signals>& sigs,
+                             std::function<void(int, siginfo_t*, void*)> func);
+        AsyncVoid operator()(const std::vector<Signals>& sigs,
+                             std::function<void(int, siginfo_t*, void*)> func, Once& once);
+
+        auto operator co_await () { return _scope.join(); }
+
+        static ON& instance() noexcept;
+
+        DISABLE_COPY(ON);
+        DISABLE_MOVE(ON);
+
+    private:
+        ON() = default;
+
+        using SType = Signal<void(int sig, siginfo_t *info, void *context)>;
+        static void invokeSignalHandler(SType& S, int sig, siginfo_t *info, void *ctx);
+        static void signalActionHandler(int sig, siginfo_t *info, void *ctx);
+
+        std::unordered_map<Signals, std::unique_ptr<SType>> _handlers{};
+        AsyncScope _scope{};
+    };
+
+    static ON& On(ON::instance());
 }

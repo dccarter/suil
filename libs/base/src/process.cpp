@@ -3,7 +3,10 @@
 //
 
 #include "suil/base/process.hpp"
-#include <suil/base/syson.hpp>
+#include "suil/base/syson.hpp"
+
+#include <suil/async/fdops.hpp>
+#include <suil/async/fdwait.hpp>
 
 #include <sys/wait.h>
 
@@ -112,7 +115,7 @@ namespace suil {
         ActiveProcess.clear();
     }
 
-    Process::UPtr Process::start(
+    task<Process::UPtr> Process::start(
             const UnorderedMap<String>& env,
             const char * cmd,
             int argc,
@@ -120,29 +123,29 @@ namespace suil {
     {
         {
             static Once sOnceChild, sOnceExit;
-            On({SIGNAL_QUIT, SIGNAL_TERM, SIGNAL_INT}, Process::onSIGTERM, sOnceExit);
-            On({SIGNAL_CHLD}, Process::onSIGCHLD, sOnceChild);
+            co_await On({SIGNAL_QUIT, SIGNAL_TERM, SIGNAL_INT}, Process::onSIGTERM, sOnceExit);
+            co_await On({SIGNAL_CHLD}, Process::onSIGCHLD, sOnceChild);
         }
         int out[2], err[2], in[2];
         if (!openpipes(in, out, err))
-            return nullptr;
+            co_return nullptr;
 
         auto proc = Process::mkunique();
         if (pipe(proc->notifChan) == -1) {
             // forking process failed
             serror("error opening notification pipe: %s", errno_s);
             closepipes(in, out, err);
-            return nullptr;
+            co_return nullptr;
         }
 
         // the read end of the pipe should be non-blocking
         suil::nonblocking(proc->notifChan[0]);
 
-        if ((proc->pid = mfork()) == -1) {
+        if ((proc->pid = fork()) == -1) {
             // forking process failed
             serror("forking failed: %s", errno_s);
             closepipes(in, out, err);
-            return nullptr;
+            co_return nullptr;
         }
 
         if (proc->pid == 0) {
@@ -175,7 +178,7 @@ namespace suil {
             proc->startReadAsync();
         }
 
-        return proc;
+        co_return proc;
     }
 
     bool Process::hasExited()
@@ -213,19 +216,21 @@ namespace suil {
             itrace("attempting to terminate an already exited process");
             Ego.stopReadAsync();
         }
-        fdclear(Ego.notifChan[0]);
+        nonblocking(Ego.notifChan[0], false);
         suil::closepipe(Ego.notifChan);
 
     }
 
-    void Process::waitForExit(const Deadline& dd)
+    AsyncVoid Process::waitForExit(milliseconds timeout)
     {
         if (Ego.hasExited())
-            return;
+            co_return;
+
+        auto dd = after(timeout);
 
         Ego.waitingExit = true;
         do {
-            int ev = fdwait(Ego.notifChan[0], FDW_IN | FDW_ERR, dd);
+            auto ev = co_await fdwait(Ego.notifChan[0], FDW(FDW_IN | FDW_ERR), dd);
             if (ev & FDW_IN) {
                 // notification received
                 int sig{0};
@@ -248,8 +253,8 @@ namespace suil {
 
     void Process::startReadAsync()
     {
-        go(processAsyncRead(Ego, Ego.stdErr, true));
-        go(processAsyncRead(Ego, Ego.stdOut, false));
+        _asyncScope.spawn(processAsyncRead(Ego, Ego.stdErr, true));
+        _asyncScope.spawn(processAsyncRead(Ego, Ego.stdOut, false));
     }
 
     void Process::stopReadAsync()
@@ -257,7 +262,6 @@ namespace suil {
         if (Ego.stdOut >= 0) {
             close(Ego.stdOut);
             Ego.stdOut = -1;
-            yield();
         }
 
         if (Ego.stdIn >= 0) {
@@ -268,20 +272,19 @@ namespace suil {
         if (Ego.stdErr >= 0) {
             close(Ego.stdErr);
             Ego.stdErr = -1;
-            yield();
         }
     }
 
-    void Process::processAsyncRead(Process& proc, int fd, bool err)
+    AsyncVoid Process::processAsyncRead(Process& proc, int fd, bool err)
     {
         proc.pendingReads++;
-        char buffer[1024];
+        char buf[1024];
         do {
-            int ev = fdwait(fd, FDW_IN | FDW_ERR, -1);
+            auto ev = co_await fdwait(fd, FDW(FDW_IN | FDW_ERR));
             ltrace(&proc, "read event{fd=%d} %d",fd, ev);
             if (ev == FDW_IN) {
                 /* data available to read from fd */
-                ssize_t nread = read(fd, buffer, sizeof(buffer)-1);
+                ssize_t nread = read(fd, buf, sizeof(buffer)-1);
                 if (nread == -1) {
                     if (errno == EWOULDBLOCK)
                         continue;
@@ -292,11 +295,11 @@ namespace suil {
                     continue;
 
                 // something has been read
-                buffer[nread] = '\0';
-                auto tmp = String{buffer, (size_t)nread, false}.dup();
+                buf[nread] = '\0';
+                auto tmp = String{buf, (size_t)nread, false}.dup();
                 if (err) {
                     if (proc.onStdError) {
-                        proc.onStdError(tmp);
+                        co_await proc.onStdError(tmp);
                     }
                     else {
                         proc.buffer.writeError(std::move(tmp));
@@ -304,7 +307,7 @@ namespace suil {
                 }
                 else {
                     if (proc.onStdOutput) {
-                        proc.onStdOutput(tmp);
+                        co_await proc.onStdOutput(tmp);
                     }
                     else {
                         proc.buffer.writeOutput(std::move(tmp));
@@ -320,20 +323,20 @@ namespace suil {
         proc.pendingReads--;
     }
 
-    void Process::flush(Process& p, OutputCallback&& rd, bool err)
+    AsyncVoid Process::flush(Process& p, OutputCallback&& rd, bool err)
     {
         if (err) {
-            p.onStdError += std::move(rd);
+            co_await (p.onStdError += std::move(rd));
             while (p.buffer.hasStderr()) {
                 auto msg = p.buffer.readError();
-                p.onStdError(msg);
+                co_await p.onStdError(msg);
             }
         }
         else {
-            p.onStdOutput += std::move(rd);
+            co_await (p.onStdOutput += std::move(rd));
             while (p.buffer.hasStdout()) {
                 auto msg = p.buffer.readOutput();
-                p.onStdOutput(msg);
+                co_await p.onStdOutput(msg);
             }
         }
     }

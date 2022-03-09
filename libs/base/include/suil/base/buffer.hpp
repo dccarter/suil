@@ -214,7 +214,7 @@ namespace suil {
          * @return the number of bytes written into the buffer on success and
          * -1 on failure
          */
-        inline ssize_t append(const strview& sv) {
+        inline ssize_t append(std::string_view& sv) {
             return append(sv.data(), sv.size());
         }
 
@@ -297,7 +297,7 @@ namespace suil {
          * @return the number of bytes copied into the buffer on success and
          * -1 on failure
          */
-        inline ssize_t hex(const strview str, bool caps = false) { return hex(str.data(), str.size(), caps); }
+        inline ssize_t hex(std::string_view str, bool caps = false) { return hex(str.data(), str.size(), caps); }
 
         /**
          * printf-style append to buffer
@@ -416,8 +416,8 @@ namespace suil {
          * @return a string view whose data is the contents
          * of the buffer
          */
-        explicit operator strview() const {
-            return strview((const char*) m_data, size());
+        explicit operator std::string_view() const {
+            return std::string_view((const char*) m_data, size());
         }
 
         /**
@@ -520,7 +520,7 @@ namespace suil {
          * @param str the string to append
          * @return
          */
-        inline Buffer& operator+=(const strview& sv) {
+        inline Buffer& operator+=(std::string_view& sv) {
             append(sv.data(), sv.size());
             return *this;
         }
@@ -705,7 +705,7 @@ namespace suil {
          * @param sv the string to copy into buffer
          * @return
          */
-        inline Buffer&  operator<<(const strview sv) {
+        inline Buffer&  operator<<(std::string_view sv) {
             append(sv.data(), sv.size());
             return *this;
         }

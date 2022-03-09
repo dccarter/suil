@@ -5,7 +5,7 @@
 #ifndef SUIL_BASE_VARINT_HPP
 #define SUIL_BASE_VARINT_HPP
 
-#include "suil/base/utils.hpp"
+#include "suil/utils/utils.hpp"
 
 #include <endian.h>
 #include <cstdint>

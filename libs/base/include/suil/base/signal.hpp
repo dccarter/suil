@@ -5,9 +5,12 @@
 #ifndef SUILRPC_SIGNAL_HPP
 #define SUILRPC_SIGNAL_HPP
 
-#include <suil/base/utils.hpp>
-#include <libmill/libmill.hpp>
+#include <suil/utils/utils.hpp>
 
+#include <suil/async/mutex.hpp>
+#include <suil/async/task.hpp>
+
+#include <atomic>
 #include <memory>
 #include <list>
 
@@ -126,9 +129,9 @@ namespace suil {
         Connection<R(Args...)> connect(Func func)
         {
             Connection<R(Args...)> conn(std::move(func));
-            mill::Lock lk{mutex};
+            AsyncMutexLock lk = co_await mutex;
             callbacks.emplace_back(conn.func);
-            return conn;
+            co_return conn;
         }
 
         /**
@@ -137,21 +140,21 @@ namespace suil {
          * @param func the function to register with the signal
          * @return  An ID which can later be used to cancel the lifetime connection
          */
-        ConnectionId operator+=(Func func) {
+        task<ConnectionId> operator+=(Func func) {
             auto conn = LifeTimeObserver{new Connection<R(Args...)>(std::move(func))};
-            mill::Lock mtx{mutex};
+            auto lk = co_await mutex.scopedLockAsync();
             callbacks.emplace_back(conn->func);
             lifeTimeObservers.push_back(conn);
-            return ConnectionId{conn};
+            co_return ConnectionId{conn};
         }
 
         /**
          * Cancel an observer using a previously returned ID
          * @param id  the ID of the observer
          */
-        void disconnect(ConnectionId& id)
+        AsyncVoid disconnect(ConnectionId& id)
         {
-            mill::Lock lk{mutex};
+            auto lk = co_await mutex.scopedLockAsync();
             if (auto connId = id.mConn.lock()) {
                 auto it = lifeTimeObservers.begin();
                 while (it != lifeTimeObservers.end()) {
@@ -166,12 +169,12 @@ namespace suil {
             }
         }
 
-        void operator()(Args... args)
+        AsyncVoid operator()(Args... args)
         {
             std::vector<std::shared_ptr<typename Callback::element_type>> snapshot;
             {
                 // take a snapshot of the callback
-                mill::Lock lk{mutex};
+                auto lk = co_await mutex.scopedLockAsync();
                 auto it = callbacks.begin();
                 while (it != callbacks.end()) {
                     auto& cb = *it;
@@ -210,7 +213,7 @@ namespace suil {
         std::list<Callback> callbacks{};
         // Life observers
         std::vector<LifeTimeObserver> lifeTimeObservers{};
-        mill::Mutex mutex;
+        AsyncMutex mutex;
     };
 }
 #endif //SUILRPC_OBSERVABLE_HPP

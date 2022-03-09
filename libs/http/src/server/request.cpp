@@ -56,7 +56,7 @@ namespace suil::http::server {
         return !Ego._flags.bodyError and !Ego._flags.offloadError;
     }
 
-    strview Request::body() const
+    std::string_view Request::body() const
     {
         if (!Ego.isValid()) {
             return {};

@@ -421,7 +421,7 @@ namespace suil {
         if (!fs::exists(path())) {
             // template required to exist
             throw MustacheParseError("attempt to reload template '",
-                                    (strview) path(), "' which does not exist");
+                                    (std::string_view) path(), "' which does not exist");
         }
 
         struct stat st{};

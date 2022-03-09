@@ -75,7 +75,7 @@ namespace suil::db {
         { return TEXTOID; }
         inline Oid type_to_pgsql_oid_type(const String&)
         { return TEXTOID; }
-        inline Oid type_to_pgsql_oid_type(const strview&)
+        inline Oid type_to_pgsql_oid_type(std::string_view&)
         { return TEXTOID; }
         inline Oid type_to_pgsql_oid_type(const iod::json_string&)
         { return JSONBOID; }
@@ -523,7 +523,7 @@ namespace suil::db {
                 static_assert(
                         (std::is_arithmetic_v<T> or
                          std::is_same_v<T, String> or
-                         std::is_same_v<T, strview> or
+                         std::is_same_v<T, std::string_view> or
                          std::is_same_v<T, std::string> or
                          std::is_same_v<T, json::Object>),
                         "Only literal types or json::Object can be present in the tuple");
@@ -634,7 +634,7 @@ namespace suil::db {
             return bind(val, oid, len, bin, norder, *const_cast<String*>(&s));
         }
 
-        void* bind(const char*& val, Oid& oid, int& len, int& bin, unsigned long long& norder, strview& v) {
+        void* bind(const char*& val, Oid& oid, int& len, int& bin, unsigned long long& norder, std::string_view& v) {
             val = v.data();
             oid  = __internal::TEXTOID;
             len  = (int) v.size();
@@ -642,8 +642,8 @@ namespace suil::db {
             return nullptr;
         }
 
-        void* bind(const char*& val, Oid& oid, int& len, int& bin, unsigned long long& norder, const strview& v) {
-            return bind(val, oid, len, bin, norder, *const_cast<strview*>(&v));
+        void* bind(const char*& val, Oid& oid, int& len, int& bin, unsigned long long& norder, std::string_view& v) {
+            return bind(val, oid, len, bin, norder, *const_cast<std::string_view*>(&v));
         }
 
         void* bind(const char*& val, Oid& oid, int& len, int& bin, unsigned long long& norder, iod::json_string& v) {
@@ -768,7 +768,7 @@ namespace suil::db {
                     char *data = PQgetvalue(*it, row, col);
                     if (data != nullptr) {
                         int len = PQgetlength(*it, row, col);
-                        v = strview{data, size_t(len)};
+                        v = std::string_view{data, size_t(len)};
                         return true;
                     }
                 }

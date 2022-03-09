@@ -5,9 +5,9 @@
 #include "suil/base/logging.hpp"
 #include "suil/base/console.hpp"
 #include "suil/base/datetime.hpp"
-#include "suil/base/exception.hpp"
 
-#include <libmill/libmill.h>
+#include <suil/utils/exception.hpp>
+
 #include <syslog.h>
 
 #ifdef SUIL_BACKTRACE
@@ -70,7 +70,7 @@ namespace suil {
         return Ego.lvl;
     }
 
-    void _Logger::forwadLogs(const char *log, size_t sz, Level l, const char* tag)
+    void _Logger::forwardLogs(const char *log, size_t sz, Level l, const char* tag)
     {
         if (writer == nullptr) {
             return;
@@ -151,8 +151,8 @@ namespace suil {
             case Level::ERROR:
             case Level::CRITICAL:
             case Level::WARNING:
-                wr = snprintf(tmp, sz, "%s/%05d/%02d: [%s] [%3s] [%10.10s] ",
-                              name, getpid(), mtid(), Datetime()(), LOGLVL_STR[(unsigned char) l],
+                wr = snprintf(tmp, sz, "%s/%05d: [%s] [%3s] [%10.10s] ",
+                              name, getpid(), Datetime()(), LOGLVL_STR[(unsigned char) l],
                               tag);
                 break;
             default:

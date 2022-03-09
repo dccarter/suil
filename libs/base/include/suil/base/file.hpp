@@ -5,15 +5,17 @@
 #ifndef SUIL_BASE_FILE_HPP
 #define SUIL_BASE_FILE_HPP
 
-#include "suil/base/buffer.hpp"
-#include "suil/base/exception.hpp"
-#include "suil/base/logging.hpp"
-#include "suil/base/string.hpp"
-#include "suil/base/utils.hpp"
+#include <suil/base/buffer.hpp>
+#include <suil/base/logging.hpp>
+#include <suil/base/string.hpp>
 
-#include <libmill/libmill.h>
+#include <suil/utils/exception.hpp>
+#include <suil/utils/utils.hpp>
+
+#include <suil/async/task.hpp>
 
 #include <fcntl.h>
+#include <sys/stat.h>
 
 namespace suil {
 
@@ -25,11 +27,6 @@ namespace suil {
     class File {
     public:
         File() = default;
-        /**
-         * Creates a new file taking a lib mill file object
-         * @param mf a lib mill file object
-         */
-        File(mfile mf);
 
         /**
          * creates a new file which operates on the given file path
@@ -40,6 +37,7 @@ namespace suil {
          * @param mode file open mode
          */
         File(const String& path, int flags, mode_t mode);
+
         /**
          * creates a new file which operates on the given file descriptor
          * @param fd the file descriptor to work with
@@ -51,15 +49,15 @@ namespace suil {
 
         File(File&) = delete;
         File&operator=(File&) = delete;
+
         /**
          * move constructor
          * @param f
          */
         File(File&& f)
-                : fd(f.fd)
-        {
-            f.fd = nullptr;
-        }
+            : _fd(std::exchange(f._fd, INVALID_FD)),
+              _own(std::exchange(f._fd, false))
+        {}
 
         /**
          * move assignment
@@ -67,8 +65,10 @@ namespace suil {
          * @return
          */
         File& operator=(File&& f) {
-            fd = f.fd;
-            f.fd = nullptr;
+            if (this != &f) {
+                _fd = std::exchange(f._fd, INVALID_FD);
+                _own = std::exchange(f._own, false);
+            }
             return Ego;
         }
 
@@ -87,34 +87,36 @@ namespace suil {
          *
          * @param data pointer to the data to write
          * @param size the size to write to file from data buffer
-         * @param dd the deadline time for the write
+         * @param timeout the timeout in milliseconds to wait for
+         * the write operation to finish
          * @return number of bytes written to file
          */
-        virtual size_t write(
+        virtual task<size_t> write(
                 const void* data,
                 size_t size,
-                const Deadline& dd = Deadline::infinite());
+                milliseconds timeout = DELAY_INF);
 
         /**
          * read data from file
          * @param data the buffer to hold the read data.
          * @param size the size of the given output buffer \param data. after reading,
          * this reference variable will have the number of bytes read into buffer
-         * @param dd the deadline time for the read
+         * @param timeout the timeout in milliseconds to wait for
+         * the read operation to finish
          * @return true for a successful read, false otherwise
          */
-        virtual bool read(
+        virtual task<bool> read(
                 void *data,
                 size_t& size,
-                const Deadline& dd = Deadline::infinite());
+                milliseconds timeout = DELAY_INF);
 
         /**
          * Reads data from a file until the end of line character is seen
          * @param dd deadline for the read
-         * @return result from readline, error code will be 0 for success and
-         * the result will be set read input
+         * @return rtimeout the timeout in milliseconds to wait for
+         * the write operation to finish
          */
-        virtual Status<String> readLine(const Deadline& dd = Deadline::infinite());
+        virtual task<Status<String>> readLine(milliseconds timeout = DELAY_INF);
 
         /**
          * file seek to given offset
@@ -132,11 +134,7 @@ namespace suil {
          * @return true if offset at end of file
          */
         virtual bool   eof();
-        /**
-         * flush the data to disk
-         * @param dd timestamp to wait for until flush is completed
-         */
-        virtual void  flush(const Deadline& dd = Deadline::infinite());
+
         /**
          * closes the file descriptor if it's being owned and it's valid
          */
@@ -146,7 +144,7 @@ namespace suil {
          * @return true if the descriptor is valid, false otherwise
          */
         virtual bool   valid() {
-            return fd != nullptr;
+            return _fd != INVALID_FD;
         }
 
         /**
@@ -154,7 +152,7 @@ namespace suil {
          * @return
          */
         virtual int raw() {
-            return mfget(fd);
+            return _fd;
         }
 
         /**
@@ -165,7 +163,7 @@ namespace suil {
          */
         bool operator==(const File& other) {
             return (this == &other)  ||
-                   ( fd == other.fd);
+                   ( _fd == other._fd);
         }
 
         /**
@@ -183,43 +181,51 @@ namespace suil {
          * @param sv the string view to write
          * @return
          */
-        File& operator<<(strview& sv);
+        task<size_t> write(std::string_view& sv, milliseconds timeout = DELAY_INF) {
+            return write(sv.data(), sv.size(), timeout);
+        }
 
         /**
          * stream operator - write a \class String into the file
          * @param str the \class String to write
          * @return
          */
-        File& operator<<(const String& str);
+        task<size_t> write(const String& str, milliseconds timeout = DELAY_INF) {
+            return write(str.data(), str.size(), timeout);
+        }
 
         /**
          * stream operator - write a \class OBuffer into the file
          * @param b the buffer to write to file
          * @return
          */
-        File& operator<<(const Buffer& b);
+        task<size_t> write(const Buffer& b, milliseconds timeout = DELAY_INF) {
+            return write(b.data(), b.size(), timeout);
+        }
 
         /**
          * stream operator - write c-style string into file
          * @param str the string to write
          * @return
          */
-        File& operator<<(const char* str);
+        task<size_t> write(const char* str, milliseconds timeout = DELAY_INF) {
+            return write(str, strlen(str), timeout);
+        }
 
         /**
          * stream operator - write c-style string into file
          * @param str the string to write
          * @return
          */
-        inline File& operator<<(const std::string& str) {
-            String tmp(str);
-            return (Ego << tmp);
+        task<size_t> write(const std::string& str, milliseconds timeout = DELAY_INF) {
+            return write(str.data(), str.size(), timeout);
         }
 
         virtual ~File();
 
     protected:
-        mfile  fd{nullptr};
+        int  _fd{INVALID_FD};
+        bool _own{false};
     };
 
     class FileLogger final : public LogWriter {
@@ -227,10 +233,14 @@ namespace suil {
         FileLogger(const String& dir, const String& prefix);
         FileLogger() = default;
 
+
         void write(const char *, size_t, Level l, const char* tag) override;
 
         inline void close() {
-            dst.close();
+            if (_fd != INVALID_FD) {
+                ::close(_fd);
+                _fd = INVALID_FD;
+            }
         }
 
         void open(const String& str, const String& prefix);
@@ -240,7 +250,8 @@ namespace suil {
         }
 
     private:
-        File dst{nullptr};
+        DISABLE_COPY(FileLogger);
+        int _fd{INVALID_FD};
     };
 
     namespace fs {
@@ -290,15 +301,15 @@ namespace suil {
 
         String readall(const char* path, bool async = false);
 
-        void append(const char *path, const void *data, size_t sz, bool async = true);
+        AsyncVoid append(const char *path, const void *data, size_t sz, bool async = true);
 
         template <DataBuf T>
-        inline void append(const char *path, const T& b, bool async = true) {
-            append(path, b.data(), b.size(), async);
+        inline AsyncVoid append(const char *path, const T& b, bool async = true) {
+            return append(path, b.data(), b.size(), async);
         }
 
-        inline void append(const char *path, const char* s, bool async = true) {
-            append(path, String{s}, async);
+        inline AsyncVoid append(const char *path, const char* s, bool async = true) {
+            return append(path, String{s}, async);
         }
 
         inline void clear(const char *path) {
@@ -309,13 +320,13 @@ namespace suil {
 
         template <typename T>
         requires (!std::is_pointer_v<T> && !DataBuf<T>)
-        inline void append(const char* path, T d, bool async = true) {
+        inline AsyncVoid append(const char* path, T d, bool async = true) {
             Buffer b(15);
             b << d;
-            append(path, b, async);
+            return append(path, b, async);
         }
 
-        bool read(const char *path, void *data, size_t sz, bool async = true);
+        task<bool> read(const char *path, void *data, size_t sz, bool async = true);
     }
 }
 #endif //SUIL_BASE_FILE_HPP

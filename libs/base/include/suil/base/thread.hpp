@@ -5,12 +5,12 @@
 #ifndef SUIL_BASE_THREAD_HPP
 #define SUIL_BASE_THREAD_HPP
 
-#include <suil/base/utils.hpp>
+#include <suil/utils/utils.hpp>
 #include <suil/base/logging.hpp>
 #include <suil/base/string.hpp>
 
-#include <libmill/libmill.hpp>
 #include <queue>
+#include <thread>
 
 namespace suil {
 

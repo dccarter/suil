@@ -10,12 +10,12 @@
 #include "suil/base/logging.hpp"
 #include "suil/base/signal.hpp"
 #include "suil/base/string.hpp"
-#include "suil/base/utils.hpp"
 
-#include <libmill/libmill.h>
+#include <suil/utils/utils.hpp>
+#include <suil/async/scope.hpp>
 
 #include <deque>
-#include <signal.h>
+#include <csignal>
 
 namespace suil {
 
@@ -74,7 +74,7 @@ namespace suil {
 
         void terminate();
 
-        void waitForExit(const Deadline& dd = Deadline::infinite());
+        AsyncVoid waitForExit(milliseconds timeout = DELAY_INF);
 
         inline String getStdOutput() {
             return Ego.buffer.readOutput();
@@ -175,14 +175,14 @@ namespace suil {
 
         void startReadAsync();
 
-        static UPtr start(const UnorderedMap<String>& env, const char* cmd, int argc, char* argv[]);
+        static task<UPtr> start(const UnorderedMap<String>& env, const char* cmd, int argc, char* argv[]);
 
         static void onSIGCHLD(int sig, siginfo_t *info, void *context);
         static void onSIGTERM(int sig, siginfo_t *info, void *context);
 
-        static coroutine void processAsyncRead(Process& proc, int fd, bool err);
+        static AsyncVoid processAsyncRead(Process& proc, int fd, bool err);
 
-        static coroutine void flush(Process& p, OutputCallback&& rd, bool err);
+        static AsyncVoid flush(Process& p, OutputCallback&& rd, bool err);
 
     private:
         pid_t           pid{0};
@@ -195,6 +195,7 @@ namespace suil {
         IOBuffer        buffer;
         OutputCallback  stdoutCallback{nullptr};
         OutputCallback  stderrCallback{nullptr};
+        AsyncScope      _asyncScope{};
     };
 }
 

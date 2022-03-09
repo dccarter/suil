@@ -4,7 +4,7 @@
 
 #include "suil/base/notify.hpp"
 
-#include <libmill/libmill.h>
+#include <suil/async/fdwait.hpp>
 
 namespace suil::fs {
 
@@ -14,23 +14,7 @@ namespace suil::fs {
 
     Watcher::~Watcher()
     {
-        if (_fd != -1) {
-            for (auto& sig: _signals) {
-                if (inotify_rm_watch(_fd, sig.first) < 0) {
-                    iwarn("Watcher::~(%d) - inotify_rm_watch(...) failed: %s",
-                            sig.first, errno_s);
-                }
-            }
-            fdclear(_fd);
-            ::close(_fd);
-            _fd = -1;
-        }
-        _signals.clear();
-
-        if (_watching) {
-            // wait for reader to coroutine to finish
-            _cond.wait();
-        }
+        close();
     }
 
     Watcher::UPtr Watcher::create()
@@ -43,38 +27,55 @@ namespace suil::fs {
         return Watcher::UPtr{new Watcher(fd)};
     }
 
-    int Watcher::watch(const String& path, uint32 events, Notifier::Func cb, uint32 mode)
+    task<int> Watcher::watch(const String& path, uint32 events, Notifier::Func cb, uint32 mode)
     {
         if (_fd == -1) {
             ierror("Watcher not initialized");
-            return -1;
+            co_return -1;
         }
 
         int wd = inotify_add_watch(_fd, path(), events|mode);
         if (wd == -1) {
             ierror("Watcher::watch(" PRIs ", %x) - inotify_add_watch(...) failed: %s",
                         _PRIs(path), events, errno_s);
-            return wd;
+            co_return wd;
         }
         if (_signals.find(wd) == _signals.end()) {
-            _signals[wd] = {};
+            _signals.emplace(wd, std::make_unique<Notifier>());
         }
+
         if (cb) {
-            _signals[wd] += std::move(cb);
+            co_await (*(_signals[wd]) += cb);
         }
 
         if (!_watching) {
             // starting receiving file events
             _watching = true;
-            go(waitForEvents(Ego));
+            _waiterScope.spawn(waitForEvents(Ego));
         }
 
-        return wd;
+        co_return wd;
     }
 
-    int Watcher::watch(const String& path, uint32 events, uint32 mode)
+    task<int> Watcher::watch(const String& path, uint32 events, uint32 mode)
     {
         return watch(path, events, nullptr, mode);
+    }
+
+    void Watcher::close()
+    {
+        if (_fd != INVALID_FD) {
+            for (auto& sig: _signals) {
+                if (inotify_rm_watch(_fd, sig.first) < 0) {
+                    iwarn("Watcher::~(%d) - inotify_rm_watch(...) failed: %s",
+                          sig.first, errno_s);
+                }
+            }
+            nonblocking(_fd, false);
+            SUIL_ASSERT(::close(_fd) != -1);
+            _fd = -1;
+        }
+        _signals.clear();
     }
 
     Watcher::Notifier& Watcher::operator[](int wd)
@@ -83,7 +84,7 @@ namespace suil::fs {
         if (it == _signals.end()) {
             throw IndexOutOfBounds("Watcher descriptor '", wd, "' not found");
         }
-        return it->second;
+        return *it->second;
     }
 
     void Watcher::unwatch(int wd)
@@ -98,7 +99,7 @@ namespace suil::fs {
         }
     }
 
-    void Watcher::waitForEvents(Watcher& S)
+    AsyncVoid Watcher::waitForEvents(Watcher& S)
     {
         ltrace(&S, "Watcher::waitForEvent(%d) start waiting for events", S._fd);
         do {
@@ -111,8 +112,11 @@ namespace suil::fs {
                     break;
                 }
                 // reading would block, wait for events
-                auto ev = fdwait(S._fd, FDW_IN, -1);
-                if ((ev & FDW_IN) != FDW_IN) {
+                waitForNotifications:
+                auto ev = co_await fdwait(S._fd, FDW_IN, after(2s));
+                if (ev == FDW_TIMEOUT && !S._signals.empty()) goto waitForNotifications;
+
+                if (ev != FDW_IN) {
                     // wait for events failed
                     ltrace(&S, "waiting for file events failed: %s", errno_s);
                     break;
@@ -124,13 +128,12 @@ namespace suil::fs {
 
         ltrace(&S, "Watcher::waitForEvent(%d) done waiting for events", S._fd);
         S._watching = false;
-        S._cond.notifyOne();
     }
 
     void Watcher::handleEvents(const char* events, size_t len)
     {
         auto ev = reinterpret_cast<const inotify_event *>(events);
-        for (auto i = 0; i < len; i += (sizeof(inotify_event) + ev->len)) {
+        for (auto i = 0u; i < len; i += (sizeof(inotify_event) + ev->len)) {
             ev = reinterpret_cast<const inotify_event *>(&events[i]);
             if ((ev->mask & IN_IGNORED) == IN_IGNORED) {
                 // Un-interesting
@@ -144,7 +147,7 @@ namespace suil::fs {
                 }
 
                 // invoke overflow handler
-                onEventQueueOverflow();
+                _waiterScope.spawn(onEventQueueOverflow());
             }
 
             auto it = _signals.find(ev->wd);
@@ -152,14 +155,16 @@ namespace suil::fs {
                 // no signal handler found, remove
                 unwatch(ev->wd);
             }
-            // invoke handler
-            it->second({
+
+            // Spawn handler
+            auto& fire = *it->second;
+            _waiterScope.spawn(fire({
                 ev->mask & IN_ALL_EVENTS,
                 ev->cookie,
                 String{ev->name, ev->len, false},
                 (ev->mask & IN_ISDIR) == IN_ISDIR,
                 (ev->mask & IN_UNMOUNT) == IN_UNMOUNT
-            });
+            }));
         }
     }
 

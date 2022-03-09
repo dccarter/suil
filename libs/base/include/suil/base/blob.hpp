@@ -5,9 +5,10 @@
 #ifndef SUIL_BASE_BLOB_HPP
 #define SUIL_BASE_BLOB_HPP
 
-#include "suil/base/exception.hpp"
 #include "suil/base/data.hpp"
-#include "suil/base/utils.hpp"
+#include "suil/utils/utils.hpp"
+
+#include <suil/utils/exception.hpp>
 
 #include <iod/json.hh>
 

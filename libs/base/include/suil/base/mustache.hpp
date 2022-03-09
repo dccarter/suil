@@ -132,14 +132,14 @@ namespace suil {
                     pos++;
             }
 
-            inline strview substr(size_t first, size_t last) {
+            inline std::string_view substr(size_t first, size_t last) {
                 if (first < size)
-                    return strview{&data[first], std::min(size-first, last-first)};
-                return strview{"invalid substr"};
+                    return std::string_view{&data[first], std::min(size-first, last-first)};
+                return std::string_view{"invalid substr"};
             }
 
-            inline strview tagName(const Action& a) {
-                return strview{&data[a.first], a.last-a.first};
+            inline std::string_view tagName(const Action& a) {
+                return std::string_view{&data[a.first], a.last-a.first};
             }
         };
         using Fragment = std::pair<size_t,size_t>;
@@ -172,9 +172,9 @@ namespace suil {
                    nullptr : String{&mBody.data()[act.first], act.last-act.first, false};
         }
 
-        inline strview tagView(const Action& act) const {
+        inline std::string_view tagView(const Action& act) const {
             return isTagEmpty(act)?
-                   strview{} : strview{&mBody.data()[act.first], act.last-act.first};
+                   std::string_view{} : std::string_view{&mBody.data()[act.first], act.last-act.first};
         }
 
         std::vector<Action>   mActions;

@@ -4,7 +4,8 @@
 
 #include "suil/base/string.hpp"
 #include "suil/base/buffer.hpp"
-#include "suil/base/exception.hpp"
+
+#include <suil/utils/exception.hpp>
 
 #include <openssl/rand.h>
 
@@ -22,7 +23,7 @@ namespace suil {
           m_own(false)
     {}
 
-    String::String(const strview str)
+    String::String(std::string_view str)
         : m_cstr(str.data()),
           m_len((uint32_t) (str.size())),
           m_own(false)
@@ -381,7 +382,7 @@ namespace suil {
 
     bool String::ishex(int checkCase) const
     {
-        strview  view = Ego;
+        std::string_view  view = Ego;
         if (checkCase < 0) {
             return view.find_first_not_of("0123456789abcdef") == std::string::npos;
         }
@@ -501,7 +502,7 @@ TEST_CASE("String test cases", "[common][String]") {
         // test sting constructor
         const char *cstr{"Hello World"};
         std::string str(cstr);
-        sb::strview     sv(str);
+        sb::std::string_view     sv(str);
 
         sb::String s1{};
         REQUIRE(s1.m_str == nullptr);

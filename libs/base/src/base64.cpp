@@ -4,7 +4,8 @@
 
 #include "suil/base/base64.hpp"
 #include "suil/base/buffer.hpp"
-#include "suil/base/exception.hpp"
+
+#include <suil/utils/exception.hpp>
 
 namespace suil::Base64 {
 

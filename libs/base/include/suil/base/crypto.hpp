@@ -7,7 +7,8 @@
 
 #include "suil/base/blob.hpp"
 #include "suil/base/string.hpp"
-#include "suil/base/exception.hpp"
+
+#include <suil/utils/exception.hpp>
 
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>

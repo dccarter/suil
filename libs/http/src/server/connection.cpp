@@ -128,7 +128,7 @@ namespace suil::http::server {
 
             if (Ego._config.keepAliveTime and !Ego._close) {
                 // set keep alive time
-                constexpr strview keepAlive{"Connection: Keep-Alive\r\n"};
+                constexpr std::string_view keepAlive{"Connection: Keep-Alive\r\n"};
                 Ego._stage.append(keepAlive);
                 Ego._stage.appendnf(30, "KeepAlive: %lu\r\n", Ego._config.keepAliveTime);
             }

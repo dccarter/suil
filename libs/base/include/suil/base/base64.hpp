@@ -25,7 +25,7 @@ namespace suil::Base64 {
 
     String decode(const uint8_t *in, size_t len);
 
-    static String decode(strview &sv) {
+    static String decode(std::string_view &sv) {
         return std::move(decode((const uint8_t *) sv.data(), sv.size()));
     }
 
@@ -49,7 +49,7 @@ namespace suil::Base64 {
 
     String urlDecode(const uint8_t *in, size_t len);
 
-    static String urlDecode(strview &sv) {
+    static String urlDecode(std::string_view &sv) {
         return std::move(urlDecode((const uint8_t *) sv.data(), sv.size()));
     }
 

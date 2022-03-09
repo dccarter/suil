@@ -55,7 +55,7 @@ namespace suil {
          * @param own if false, a reference to the string view buffer will be kept
          * otherwise the reference will be own and be free when the String is being destroyed
          */
-        explicit String(const strview str);
+        explicit String(std::string_view str);
 
         /**
          * creates a string from the given standard string
@@ -151,11 +151,11 @@ namespace suil {
         }
 
         /**
-         * strview cast operator
+         * std::string_view cast operator
          * @return string view whose data is the buffer referred to by this string
          */
-        operator strview() const {
-            return strview{m_str, m_len};
+        operator std::string_view() const {
+            return std::string_view{m_str, m_len};
         }
 
         /**
@@ -618,7 +618,7 @@ namespace suil {
                 return key.m_hash;
             }
 
-            auto hash = std::hash<strview>{}(strview{key.data(), key.size()});
+            auto hash = std::hash<std::string_view>{}(std::string_view{key.data(), key.size()});
             key.m_hash = hash;
             return hash;
         }

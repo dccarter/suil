@@ -5,9 +5,10 @@
 #include "suil/base/data.hpp"
 
 #include "suil/base/base64.hpp"
-#include "suil/base/exception.hpp"
 #include "suil/base/string.hpp"
 #include "suil/base/buffer.hpp"
+
+#include <suil/utils/exception.hpp>
 
 namespace suil {
 

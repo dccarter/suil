@@ -4,9 +4,10 @@
 
 #include "suil/base/args.hpp"
 
-#include <suil/base/exception.hpp>
 #include <suil/base/buffer.hpp>
 #include <suil/base/console.hpp>
+
+#include <suil/utils/exception.hpp>
 
 namespace suil::args {
 
@@ -113,7 +114,7 @@ namespace suil::args {
         return false;
     }
 
-    bool Command::parse(int argc, char** argv, bool debug)
+    task<bool> Command::parse(int argc, char** argv, bool debug)
     {
         int pos{0};
         String zArg{};
@@ -219,7 +220,7 @@ namespace suil::args {
                 }
                 if (arg.Prompt) {
                     // Command argument is interactive, request value from console
-                    requestValue(arg);
+                    co_await requestValue(arg);
                 }
                 else {
                     msg << (missing? ", '" : " '") << arg.Lf << '\'';
@@ -239,17 +240,17 @@ namespace suil::args {
             }
         }
 
-        return isHelp;
+        co_return isHelp;
     }
 
-    void Command::requestValue(Arg& arg)
+    AsyncVoid Command::requestValue(Arg& arg)
     {
         Status<String> status;
         if (arg.Hidden) {
             status = readPasswd(arg.Prompt);
         }
         else {
-            status = readParam(arg.Prompt, arg.Default);
+            status = co_await readParam(arg.Prompt, arg.Default);
         }
         if (status.error and arg.Required) {
             throw InvalidArguments("error: required interactive argument '", arg.Lf, "' not provided");
@@ -520,7 +521,7 @@ namespace suil::args {
         out << "\n";
     }
 
-    void Parser::parse(int argc, char **argv)
+    AsyncVoid Parser::parse(int argc, char **argv)
     {
         if (argc <= 1) {
             // show application help
@@ -552,7 +553,7 @@ namespace suil::args {
             // parse command line (appname command)
             int nargs{argc-2};
             char  **args = nargs? &argv[2] : &argv[1];
-            showhelp[0] = cmd->parse(argc-2, args);
+            showhelp[0] = co_await cmd->parse(argc-2, args);
         }
         catch (Exception& ser) {
             showhelp[0] = true;
@@ -586,19 +587,17 @@ namespace suil::args {
                                 "invoked before invoking handle");
     }
 
-    Status<String> readParam(const String& display, const String& def)
+    task<Status<String>> readParam(const String& display, const String& def)
     {
         write(STDIN_FILENO, display.data(), display.size());
         sync();
-        auto [err, val] = Console::in().readLine();
-        if (err == 0) {
-            return Ok(std::move(val));
+        auto ret = co_await Console::in().readLine();
+        if (ret.error != 0) {
+            if (def) {
+                ret = Ok(def.dup());
+            }
         }
-        else if (def) {
-            return Ok(def.dup());
-        }
-
-        return {-1};
+        co_return std::move(ret);
     }
 
     Status<String> readPasswd(const String& display)

@@ -5,7 +5,7 @@
 #ifndef SUIL_BASE_SIO_HPP
 #define SUIL_BASE_SIO_HPP
 
-#include "suil/base/utils.hpp"
+#include "suil/utils/utils.hpp"
 
 #include <iod/sio.hh>
 

@@ -19,7 +19,7 @@ namespace suil::saw::Stw {
             case Level::WARNING:
             case Level::DEBUG:
             case Level::TRACE:
-                sSysLog.write(log, size, level, nullptr);
+                sSysLog.writeAsync(log, size, level, nullptr);
                 break;
             default:
                 break;

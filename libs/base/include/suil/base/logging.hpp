@@ -5,11 +5,14 @@
 #ifndef SUIL_BASE_LOGGING_HPP
 #define SUIL_BASE_LOGGING_HPP
 
-#include <suil/base/utils.hpp>
+#include <suil/utils/utils.hpp>
 #include <suil/base/symbols.hpp>
+
+#include <suil/async/task.hpp>
 
 #include <iod/options.hh>
 
+#include <cstring>
 #include <cstdarg>
 #include <functional>
 #include <memory>
@@ -138,7 +141,7 @@ namespace suil {
 
         bool isValid() const;
 
-        void forwadLogs(const char *log, size_t sz, Level l, const char* tag);
+        void forwardLogs(const char *log, size_t sz, Level l, const char* tag);
 
         size_t format(char *out, Level l, const char *tag, const char *fmt, va_list args);
 
@@ -208,7 +211,7 @@ namespace suil {
 
         if (sz > 0) {
             // forward logs to their destination
-            _Log.forwadLogs(buf, sz, l, T::TAG);
+            _Log.forwardLogs(buf, sz, l, T::TAG);
         }
 
         if (l == Level::CRITICAL) {

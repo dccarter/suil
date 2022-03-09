@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <suil/base/exception.hpp>
-#include <suil/base/utils.hpp>
+#include <suil/utils/exception.hpp>
+#include <suil/utils/utils.hpp>
 #include <suil/base/string.hpp>
 #include <suil/sawtooth/protos.hpp>
 

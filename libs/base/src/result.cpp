@@ -68,7 +68,7 @@ TEST_CASE("Using Result API's", "[Result]") {
 
         Result res1{Result::Error, "Simple error message"};
         REQUIRE_FALSE(res1.Ok());
-        REQUIRE(suil::strview(res1) == "Simple error message");
+        REQUIRE(suil::std::string_view(res1) == "Simple error message");
     }
 
     WHEN("Building stacked results") {
@@ -76,19 +76,19 @@ TEST_CASE("Using Result API's", "[Result]") {
         REQUIRE(res.Ok());
         res << "Good status code";
         REQUIRE(res.Ok());
-        REQUIRE(suil::strview(res) == "Good status code");
+        REQUIRE(suil::std::string_view(res) == "Good status code");
         res();
         REQUIRE(res.Ok());
-        REQUIRE(suil::strview(res) == "Good status code\n\t");
+        REQUIRE(suil::std::string_view(res) == "Good status code\n\t");
         res << "Other good status code";
         REQUIRE(res.Ok());
-        REQUIRE(suil::strview(res) == "Good status code\n\tOther good status code");
+        REQUIRE(suil::std::string_view(res) == "Good status code\n\tOther good status code");
         res(Result::Error);
         REQUIRE_FALSE(res.Ok());
-        REQUIRE(suil::strview(res) == "Good status code\n\tOther good status code\nCode_-1: ");
+        REQUIRE(suil::std::string_view(res) == "Good status code\n\tOther good status code\nCode_-1: ");
         res << "Error stuff";
         REQUIRE_FALSE(res.Ok());
-        REQUIRE(suil::strview(res) == "Good status code\n\tOther good status code\nCode_-1: Error stuff");
+        REQUIRE(suil::std::string_view(res) == "Good status code\n\tOther good status code\nCode_-1: Error stuff");
     }
 }
 #endif
