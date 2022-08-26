@@ -186,7 +186,7 @@ SCENARIO("Using suil::Data") {
             REQUIRE(d.m_own);
             return d;
         })(std::move(d3));
-        REQUIRE_FALSE(d4.m_data == nums);
+        REQUIRE(d4.m_data == nums);
         REQUIRE(d4.m_data[0] == 1);
         REQUIRE(d4.m_data[1] == 2);
         REQUIRE(d4.m_data[2] == 3);
