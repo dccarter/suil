@@ -120,7 +120,7 @@ namespace suil::net {
     {
         body() << msg;
         if (ctype) {
-            std::move(ctype);
+            Ego.bodyType = std::move(ctype);
         }
     }
 

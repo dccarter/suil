@@ -279,7 +279,9 @@ namespace suil::db {
             ltrace(&db, "starting prune with %ld connections", db.conns.size());
             while (it != db.conns.end()) {
                 if ((*it).alive <= t) {
+                    lk.unlock();
                     (*it).cleanup();
+                    lk.lock();
                     db.conns.erase(it);
                     it = db.conns.begin();
                 } else {
