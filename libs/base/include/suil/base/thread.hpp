@@ -261,7 +261,7 @@ namespace suil {
                 // default  to number of CPU cores
                 idebug("pool '" PRIs "' - defaulting number of executors to number of CPU cores {%u}",
                             _PRIs(_name), nCores);
-                _nExecutors = nCores;
+                _nExecutors = nCores - 1;
             }
 
             if (_nExecutors > nCores) {

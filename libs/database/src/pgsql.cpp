@@ -220,7 +220,7 @@ namespace suil::db {
 
         // Still holding mutex
         if (conn == nullptr){
-            // try find connection from cached list
+            // try finding a connection from cached list
             if(!conns.empty()){
                 auto h = conns.back();
                 /* cancel Connection expiry */
@@ -230,11 +230,11 @@ namespace suil::db {
             }
             else {
                 // connection limit reach
-                throw PgSqlException("Postgres SQL connection limit reached");
+                throw PgSqlException("Postgres SQL connection limit reached: ", conns.size());
             }
         }
 
-        Connection *c = new Connection(
+        auto *c = new Connection(
                 conn, dbname.peek(), async, timeout,
                 [&](Connection* _conn) {
                     free(_conn);
@@ -286,10 +286,13 @@ namespace suil::db {
             ltrace(&db, "starting prune with %ld connections", db.conns.size());
             while (it != db.conns.end()) {
                 if ((*it).alive <= t) {
-                    lk.unlock();
-                    (*it).cleanup();
-                    lk.lock();
+                    auto curr = *it;
                     db.conns.erase(it);
+
+                    lk.unlock();
+                    curr.cleanup();
+                    lk.lock();
+
                     it = db.conns.begin();
                 } else {
                     /* there is no point in going forward */

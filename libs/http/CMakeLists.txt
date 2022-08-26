@@ -6,6 +6,7 @@ project(Http VERSION ${SUIL_HTTP_VERSION} LANGUAGES C CXX)
 
 include(Server.cmake)
 include(Client.cmake)
+include(tfb/benchmark/Developer.cmake)
 
 set(SUIL_HTTP_SCC_SOURCES
         scc/client.scc
