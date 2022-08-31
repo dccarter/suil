@@ -14,6 +14,12 @@ jobs:
         type: [Debug, Release]
 
     steps:
+      - name: Get Version
+        id: tag_version
+        run: |
+          tag=${GITHUB_REF#refs/*/v}
+          echo ::set-output name=version::${tag%-*}
+
       - uses: actions/checkout@v2
       # Create a build directory
       - name: Create Build Environment
@@ -24,10 +30,9 @@ jobs:
         shell: bash
         run: |
           cd build-${{ matrix.type }}
-          tag=${GITHUB_REF#refs/*/v}
           cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} \
                                   -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }} \
-                                  -DSUIL_VERSION=${tag%-*}
+                                  -DSUIL_VERSION=${{steps.tag_version.outputs.version}}
 
       # Build project dependencies
       - name: Build Dependecies
@@ -74,7 +79,9 @@ jobs:
       - name: Get Version
         id: tag_version
         run: |
-          echo ::set-output name=version::${GITHUB_REF#refs/*/}
+          tag=${GITHUB_REF#refs/*/}
+          echo ::set-output name=tag::$tag
+          echo ::set-output name=version::${tag%-*}
       - uses: actions/checkout@v2
       - name: Create Release
         id: create_release
@@ -82,8 +89,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.tag_version.outputs.version }}
-          release_name: Release ${{ steps.tag_version.outputs.version }}
+          tag_name: ${{ steps.tag_version.outputs.tag }}
+          release_name: Release ${{ steps.tag_version.outputs.tag }}
           body: |
             Changes in this Release
             - Initial release
@@ -91,7 +98,7 @@ jobs:
           prerelease: false
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.tag_version.outputs.version }}
+      version: ${{ steps.tag_version.outputs.tag }}
 
   release:
     runs-on: ubuntu-latest
