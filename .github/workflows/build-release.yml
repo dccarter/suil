@@ -81,7 +81,8 @@ jobs:
         run: |
           tag=${GITHUB_REF#refs/*/}
           echo ::set-output name=tag::$tag
-          echo ::set-output name=version::${tag%-*}
+          tmp=${tag#v*}
+          echo ::set-output name=version::${tmp%-*}
       - uses: actions/checkout@v2
       - name: Create Release
         id: create_release
@@ -98,7 +99,8 @@ jobs:
           prerelease: false
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.tag_version.outputs.tag }}
+      tag: ${{ steps.tag_version.outputs.tag }}
+      version: ${{ steps.tag_version.outputs.version }}
 
   release:
     runs-on: ubuntu-latest
@@ -119,6 +121,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release0.outputs.upload_url }}
-          asset_path: artifacts/Suil-${{needs.release0.steps.tag_version.outputs.version}}-${{ matrix.type }}.tar.gz
-          asset_name: Suil-${{ needs.release0.steps.tag_version.outputs.version }}-${{ matrix.type }}.tar.gz
+          asset_path: artifacts/Suil-${{ needs.release0.outputs.version }}-${{ matrix.type }}.tar.gz
+          asset_name: Suil-${{ needs.release0.outputs.version }}-${{ matrix.type }}.tar.gz
           asset_content_type: application/zip
