@@ -5,9 +5,6 @@ on:
     tags:
       - v*
 
-env:
-  VERSION: 0.1.0
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,6 +14,10 @@ jobs:
         type: [Debug, Release]
 
     steps:
+      - name: Get Version
+        id: tag_version
+        run: |
+          echo ::set-output name=version::${GITHUB_REF#refs/*/}
       - uses: actions/checkout@v2
       # Create a build directory
       - name: Create Build Environment
@@ -29,7 +30,7 @@ jobs:
           cd build-${{ matrix.type }}
           cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} \
                                   -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }} \
-                                  -DSUIL_VERSION=$VERSION
+                                  -DSUIL_VERSION=${{steps.tag_version.outputs.version}}
 
       # Build project dependencies
       - name: Build Dependecies
@@ -57,7 +58,6 @@ jobs:
           ./libs/http/httpserver_unittest -r junit -o httpserver_unittest.xml
           ./libs/http/httpclient_unittest -r junit -o httpclient_unittest.xml
 
-
       - name: Create build artifact
         shell: bash
         run: |
@@ -68,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Suil-${{ matrix.type }}
-          path: build-${{ matrix.type }}/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
+          path: build-${{ matrix.type }}/Suil-${{steps.tag_version.outputs.version}}-${{ matrix.type }}.tar.gz
 
   release0:
     runs-on: ubuntu-latest
@@ -115,6 +115,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release0.outputs.upload_url }}
-          asset_path: artifacts/Suil-${{env.VERSION}}-${{ matrix.type }}.tar.gz
-          asset_name: Suil-${{ env.VERSION }}-${{ matrix.type }}.tar.gz
+          asset_path: artifacts/Suil-${{needs.release0.steps.tag_version.outputs.version}}-${{ matrix.type }}.tar.gz
+          asset_name: Suil-${{ needs.release0.steps.tag_version.outputs.version }}-${{ matrix.type }}.tar.gz
           asset_content_type: application/zip
