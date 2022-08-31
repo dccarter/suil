@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     ep.middleware<PgSqlMiddleware>().setup(
             suil::env("POSTGRES_CONN", DEFAULT_POSTGRES_CONN),
             opt(ASYNC,   true),   // connections are async
-            opt(TIMEOUT, 5_sec),  // timeout on db transactions
+            opt(TIMEOUT, 10_sec),  // timeout on db transactions
             opt(EXPIRES, 30_sec)  // connections are cached for 30 seconds
     );
 
@@ -151,5 +151,5 @@ int main(int argc, char *argv[])
         resp.end();
     });
 
-    return ep.start(opt(nprocs, 3));
+    return ep.start(opt(nprocs, 0));
 }

@@ -417,6 +417,8 @@ namespace suil::db {
 
                 if (err) {
                     /* error occurred and was reported in logs */
+                    fdclean(sock);
+                    PQreset(conn);
                     throw PgSqlException("[", sock, "] query failed: ", PQerrorMessage(conn));
                 }
 
