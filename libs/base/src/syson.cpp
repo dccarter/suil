@@ -26,7 +26,7 @@ namespace suil {
 
     static void signalActionHandler(int sig, siginfo_t *info, void *ctx)
     {
-        static std::atomic_bool s_Exiting{false};
+        static bool s_Exiting{false};
         if (s_Exiting) {
             sdebug("received signal %d while exiting", sig);
             return;

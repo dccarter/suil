@@ -8,6 +8,9 @@
 #include "suil/net/socket.hpp"
 #include "suil/net/config.scc.hpp"
 
+#include <sys/wait.h>
+#include <sys/prctl.h>
+
 namespace suil::net {
 
     define_log_tag(SERVER);
@@ -50,7 +53,8 @@ namespace suil::net {
             return true;
         }
 
-        int start() {
+        template <typename... Opts>
+        int start(Opts... opts) {
             if ((Adaptor == nullptr) || !Adaptor->isRunning()) {
                 // create socket adaptor
                 if (!listen()) {
@@ -58,28 +62,43 @@ namespace suil::net {
                 }
             }
 
-            int status{EXIT_SUCCESS};
-
-            while (!mExiting) {
-                if (auto sock = Adaptor->accept(mConfig.acceptTimeout)) {
-                    go(handle(Ego, std::move(sock)));
-                }
-                else {
-                    if (errno != ETIMEDOUT) {
-                        if (!mExiting) {
-                            ierror("accepting next connection failed: %s", errno_s);
-                            status = errno;
-                        }
-                    }
-
-                    // cleanup adaptor socket
-                    Adaptor->close();
-                    break;
-                }
+            if (nprocs == 0) {
+                nprocs = sysconf(_SC_NPROCESSORS_ONLN);
             }
-            mExiting = false;
-            idebug("Server exiting {status=%d}", status);
-            return status;
+
+            if (nprocs == 1) {
+                int status = accept();
+                idebug("Server exiting {status=%d}", status);
+                return status;
+            }
+
+            idebug("Starting %u server processes", nprocs);
+
+            for (int i = 0; i < nprocs; i++) {
+                auto pid = mfork();
+                if (pid > 0) {
+                    idebug("Server process started {pid=%d}", pid);
+                    continue;
+                }
+
+                prctl(PR_SET_PDEATHSIG, SIGHUP);
+                int status = accept();
+                idebug("Server process exiting {status=%d}", i, status);
+                return status;
+            }
+
+            // Wait for all workers to exit
+            int ret = EXIT_SUCCESS;
+            while (true) {
+                int status = EXIT_SUCCESS;
+                auto pid = wait(&status);
+                if (pid <= 0)
+                    break;
+                ret = status == EXIT_SUCCESS? ret : status;
+                idebug("server process exited {pid=%d, status=%d}", pid, status);
+            }
+
+            return ret;
         }
 
         void stop()
@@ -100,6 +119,30 @@ namespace suil::net {
         }
 
     private:
+        int accept()
+        {
+            int status = EXIT_SUCCESS;
+            while (!mExiting) {
+                if (auto sock = Adaptor->accept(mConfig.acceptTimeout)) {
+                    go(handle(Ego, std::move(sock)));
+                }
+                else {
+                    if (errno != ETIMEDOUT) {
+                        if (!mExiting) {
+                            ierror("accepting next connection failed: %s", errno_s);
+                            status = errno;
+                        }
+                    }
+
+                    // cleanup adaptor socket
+                    Adaptor->close();
+                    break;
+                }
+            }
+            mExiting = false;
+            return status;
+        }
+
         static coroutine void handle(Server& Self, Socket::UPtr&& sock)
         {
             Socket::UPtr tmp = std::move(sock);

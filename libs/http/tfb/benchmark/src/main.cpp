@@ -57,8 +57,7 @@ int main(int argc, char *argv[])
     };
 
     Endpoint<SystemAttrs, PgSqlMiddleware> ep{"/",
-          opt(serverConfig, std::move(config)),
-          opt(numberOfWorkers, 0)   /* Will run with number of available cores */
+          opt(serverConfig, std::move(config))
     };
 
     ep.middleware<PgSqlMiddleware>().setup(
@@ -70,7 +69,8 @@ int main(int argc, char *argv[])
 
 #if SUIL_BENCH_DEV == 1
     {
-        scoped(conn, ep.middleware<PgSqlMiddleware>().conn());
+        // Open an uncached connection
+        scoped(conn, ep.middleware<PgSqlMiddleware>().conn(false));
         seedDatabase(conn);
     }
 #endif
@@ -151,5 +151,5 @@ int main(int argc, char *argv[])
         resp.end();
     });
 
-    return ep.start();
+    return ep.start(3);
 }

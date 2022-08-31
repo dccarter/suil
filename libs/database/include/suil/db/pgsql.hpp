@@ -1022,7 +1022,7 @@ namespace suil::db {
             return connection();
         }
 
-        Connection& connection();
+        Connection& connection(bool cached = true);
 
         template<typename... Opts>
         void init(const String& connStr, Opts... opts) {
@@ -1062,7 +1062,7 @@ namespace suil::db {
 
         static coroutine void cleanup(PgSqlDb& db);
 
-        void free(Connection* conn);
+        void free(Connection* conn, bool cached);
 
         struct conn_handle_t {
             PGconn  *conn;

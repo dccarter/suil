@@ -71,10 +71,10 @@ namespace suil::http::server {
             return Ego.backend().listen();
         }
 
-        inline int start() {
+        template <typename... Opts>
+        inline int start(Opts... opts) {
             Ego.router().validate();
-            itrace("starting server....");
-            return Ego.backend().start();
+            return Ego.backend().start(std::forward<Opts>(opts)...);
         }
 
         inline void stop() {

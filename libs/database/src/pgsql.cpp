@@ -196,10 +196,10 @@ namespace suil::db {
         }
     }
 
-    PgSqlDb::Connection& PgSqlDb::connection()
+    PgSqlDb::Connection& PgSqlDb::connection(bool cached)
     {
         PGconn *conn{nullptr};
-        if (conns.empty()) {
+        if (!cached || conns.empty()) {
             /* open a new Connection */
             int y{2};
             do {
@@ -212,7 +212,7 @@ namespace suil::db {
         // Still holding mutex
         if (conn == nullptr){
             // try find connection from cached list
-            if(!conns.empty()){
+            if(cached && !conns.empty()){
                 auto h = conns.back();
                 /* cancel Connection expiry */
                 h.alive = -1;
@@ -225,10 +225,10 @@ namespace suil::db {
             }
         }
 
-        Connection *c = new Connection(
+        auto *c = new Connection(
                 conn, dbname.peek(), async, timeout,
-                [&](Connection* _conn) {
-                    free(_conn);
+                [&, cached = cached](Connection* _conn) {
+                    free(_conn, cached);
                 });
         return *c;
     }
@@ -279,9 +279,7 @@ namespace suil::db {
             ltrace(&db, "starting prune with %ld connections", db.conns.size());
             while (it != db.conns.end()) {
                 if ((*it).alive <= t) {
-                    lk.unlock();
                     (*it).cleanup();
-                    lk.lock();
                     db.conns.erase(it);
                     it = db.conns.begin();
                 } else {
@@ -306,10 +304,10 @@ namespace suil::db {
         db.cleaning = false;
     }
 
-    void PgSqlDb::free(Connection* conn) {
+    void PgSqlDb::free(Connection* conn, bool cached) {
         conn_handle_t h {conn->conn, -1};
 
-        if (keepAlive != 0) {
+        if (cached && keepAlive != 0) {
             /* set connections keep alive */
             h.alive = mnow() + keepAlive;
             conns.push_back(h);
