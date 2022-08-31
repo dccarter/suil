@@ -14,10 +14,6 @@ jobs:
         type: [Debug, Release]
 
     steps:
-      - name: Get Version
-        id: tag_version
-        run: |
-          echo ::set-output name=version::${GITHUB_REF#refs/*/}
       - uses: actions/checkout@v2
       # Create a build directory
       - name: Create Build Environment
@@ -28,9 +24,10 @@ jobs:
         shell: bash
         run: |
           cd build-${{ matrix.type }}
+          tag=${GITHUB_REF#refs/*/v}
           cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} \
                                   -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }} \
-                                  -DSUIL_VERSION=${{steps.tag_version.outputs.version}}
+                                  -DSUIL_VERSION=${tag%-*}
 
       # Build project dependencies
       - name: Build Dependecies
