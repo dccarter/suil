@@ -8,7 +8,6 @@
 #include "suil/base/buffer.hpp"
 #include "suil/base/sio.hpp"
 #include "suil/base/logging.hpp"
-#include "suil/base/signal.hpp"
 #include "suil/base/string.hpp"
 #include "suil/base/utils.hpp"
 
@@ -26,7 +25,7 @@ namespace suil {
     class Process final: LOGGER(PROCESS) {
     public:
         sptr(Process);
-        using OutputCallback = std::function<bool(String&)>;
+        using OutputCallback = std::function<void(String&&)>;
 
         template <typename... Args>
         static UPtr launch(const char *cmd, Args... args) {
@@ -100,9 +99,6 @@ namespace suil {
                 go(flushBuffers(Ego, std::move(cbs.onStdOutput), false));
             }
         }
-
-        Signal<bool(String&)> onStdOutput;
-        Signal<bool(String&)> onStdError;
 
         ~Process() {
             terminate();

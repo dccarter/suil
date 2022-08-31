@@ -17,6 +17,8 @@
 #pragma symbol onDisconnect
 #pragma symbol onMessage
 #pragma symbol blockingBroadcast
+#pragma symbol nprocs
+#pragma symbol postfork
 
 #pragma symbol MinChars
 #pragma symbol MaxChars
@@ -47,9 +49,6 @@ namespace suil::http::server {
         size_t sendChunk{512_Kib};
         uint64 keepAliveTime{3600_ms};
         uint64 hstsEnable{3600_ms};
-        uint32 numberOfWorkers{1};
-        uint32 threadPoolBackoffHigh{1000};
-        uint32 threadPoolBackoffLow{1000};
         String serverName{"Suil-Http-Server"};
         String offloadDir{"./.body"};
     };

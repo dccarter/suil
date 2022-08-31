@@ -74,7 +74,7 @@ namespace suil {
          * buffer shouldn't escape the lock
          */
         const char* operator()() {
-            static __thread char buf[64] = {0};
+            static char buf[64] = {0};
             return str(buf, sizeof(buf), LOG_FMT);
         }
 
@@ -92,7 +92,7 @@ namespace suil {
          * buffer shouldn't escape the lock
          */
         const char* operator()(const char *fmt) {
-            static __thread char buf[64] = {0};
+            static char buf[64] = {0};
             return str(buf, sizeof(buf), fmt);
         }
 

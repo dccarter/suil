@@ -41,7 +41,7 @@ namespace suil::net::smtp {
             : content{nullptr}
         {
             auto idx = id.find(':');
-            if (idx != String::npos) {
+            if (idx > 0) {
                 box = suil::catstr("/tmp/smail/", Base64::encode(id.substr(0, idx)));
             }
             else {
@@ -398,7 +398,7 @@ namespace suil::net::smtp {
         auto space = arg.find(' ');
         String proto = arg.peek();
         String auth{};
-        if (space != String::npos) {
+        if (space > 0) {
             proto = arg.substr(0, space++);
             auth  = arg.substr(space);
         }
@@ -556,13 +556,13 @@ namespace suil::net::smtp {
             ssize_t pos{0};
             if (userPasswd[pos++] != '\0') {
                 auto tmp = userPasswd.find('\0');
-                if (tmp != String::npos) {
+                if (tmp > 0) {
                     id = userPasswd.substr(0, tmp);
                     pos = tmp+1;
                 }
             }
             auto tmp = userPasswd.substr(pos).find('\0');
-            if (tmp != String::npos) {
+            if (tmp > 0) {
                 user = userPasswd.substr(pos, (tmp-pos));
                 pos = tmp+1;
             }

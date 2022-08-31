@@ -35,7 +35,7 @@ namespace suil::http::server {
             });
         }
 
-    private suil_ut:
+    private:
         char *_url{nullptr};
         std::vector<char *> _params;
     };

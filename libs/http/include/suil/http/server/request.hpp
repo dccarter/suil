@@ -137,7 +137,7 @@ namespace suil::http::server {
         QueryString _qps;
         net::Socket& _sock;
         HttpServerConfig& _config;
-        size_t _contentLength{0};
+
         friend class SystemAttrs;
         friend class Router;
         friend class ConnectionImpl;

@@ -141,4 +141,5 @@ namespace suil::http::server {
     };
 }
 
+#include <suil/db/redis.hpp>
 #endif //SUIL_HTTP_SERVER_JWTSESSION_HPP

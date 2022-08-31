@@ -93,8 +93,8 @@ namespace suil::fs {
         int _fd{-1};
         using Signals = std::map<int, Notifier>;
         Signals _signals{};
-        std::atomic_bool _watching{false};
-        mill::Event _cond{};
+        bool _watching{false};
+        Conditional _cond{};
     };
 }
 #endif //SUIL_BASE_NOTIFY_HPP

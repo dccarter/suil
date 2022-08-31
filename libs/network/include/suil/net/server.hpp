@@ -8,6 +8,9 @@
 #include "suil/net/socket.hpp"
 #include "suil/net/config.scc.hpp"
 
+#include <sys/wait.h>
+#include <sys/prctl.h>
+
 namespace suil::net {
 
     define_log_tag(SERVER);
@@ -15,9 +18,7 @@ namespace suil::net {
     ServerSocket::UPtr createAdaptor(const SocketConfig& config);
     bool adaptorListen(ServerSocket& adaptor, const SocketConfig& config, int backlog);
     String getAddress(const SocketConfig& config);
-
-    struct CustomSchedulingHandler {
-    };
+    using Postfork = std::function<void(uint32)>;
 
     template <typename Handler, class Context = void>
     class Server: LOGGER(SERVER) {
@@ -53,48 +54,67 @@ namespace suil::net {
             return true;
         }
 
-        virtual int start() {
+        template <typename... Opts>
+        int start(Opts... opts) {
+            struct {
+                uint32 nprocs{0};
+                Postfork postfork{nullptr};
+            } config;
+
             if ((Adaptor == nullptr) || !Adaptor->isRunning()) {
                 // create socket adaptor
                 if (!listen()) {
                     return errno;
                 }
             }
+            applyConfig(config, std::forward<Opts>(opts)...);
 
-            int status{EXIT_SUCCESS};
-
-            while (!mExiting) {
-                if (auto sock = Adaptor->accept(mConfig.acceptTimeout)) {
-                    if constexpr (!std::is_base_of_v<CustomSchedulingHandler, Handler>) {
-                        go(handle(Ego, std::move(sock)));
-                    }
-                    else {
-                        Handler{}(std::move(sock), *mContext);
-                    }
-                }
-                else {
-                    if (errno != ETIMEDOUT) {
-                        if (!mExiting) {
-                            ierror("accepting next connection failed: %s", errno_s);
-                            status = errno;
-                        }
-                    }
-
-                    // cleanup adaptor socket
-                    Adaptor->close();
-                    break;
-                }
+            if (config.nprocs == 0) {
+                // By default the server will use all the available CPU threads
+                config.nprocs = sysconf(_SC_NPROCESSORS_ONLN);
             }
-            mExiting = false;
-            idebug("Server exiting {status=%d}", status);
-            return status;
+
+            if (config.nprocs == 1) {
+                int status = accept();
+                idebug("Server exiting {status=%d}", status);
+                return status;
+            }
+
+            idebug("Server starting %u workers", config.nprocs);
+
+            for (uint32 i = 0; i < config.nprocs; i++) {
+                auto pid = mfork();
+                if (pid > 0) {
+                    idebug("Server worker-%u started {pid=%d}", i, pid);
+                    continue;
+                }
+
+                prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+                if (config.postfork) {
+                    config.postfork(i);
+                }
+
+                int status = accept();
+                idebug("Server worker-%u exiting {status=%d}", i, status);
+                return status;
+            }
+
+            // Wait for all workers to exit
+            int ret = EXIT_SUCCESS;
+            while (true) {
+                int status = EXIT_SUCCESS;
+                auto pid = wait(&status);
+                if (pid <= 0)
+                    break;
+                ret = status == EXIT_SUCCESS? ret : status;
+                idebug("Server worker exited {pid=%d, status=%d}", pid, status);
+            }
+
+            return ret;
         }
 
-        inline bool isRunning() const {
-            return (Adaptor != nullptr) and Adaptor->isRunning();
-        }
-
-        virtual void stop()
+        void stop()
         {
             idebug("stopping server...");
             mExiting = true;
@@ -112,11 +132,35 @@ namespace suil::net {
         }
 
     private:
+        int accept()
+        {
+            int status = EXIT_SUCCESS;
+            while (!mExiting) {
+                if (auto sock = Adaptor->accept(mConfig.acceptTimeout)) {
+                    go(handle(Ego, std::move(sock)));
+                }
+                else {
+                    if (errno != ETIMEDOUT) {
+                        if (!mExiting) {
+                            ierror("accepting next connection failed: %s", errno_s);
+                            status = errno;
+                        }
+                    }
+
+                    // cleanup adaptor socket
+                    Adaptor->close();
+                    break;
+                }
+            }
+            mExiting = false;
+            return status;
+        }
+
         static coroutine void handle(Server& Self, Socket::UPtr&& sock)
         {
             Socket::UPtr tmp = std::move(sock);
             try {
-                Handler()(*tmp, *Self.mContext);
+                Handler()(*tmp, Self.mContext);
                 if (tmp->isOpen()) {
                     // close socket if still open
                     tmp->close();

@@ -9,20 +9,16 @@ namespace suil::rpc::srpc {
 
     const RpcServerConfig& Connection::getConfig() const
     {
-        if (_context != nullptr) {
-            return _context->config();
+        if (context != nullptr) {
+            return context->config();
         }
         static  RpcServerConfig defaultServerConfig;
         return defaultServerConfig;
     }
 
-    void Connection::operator()(net::Socket& sock, Context& ctx)
+    void Connection::operator()(net::Socket& sock, std::shared_ptr<Context> ctx)
     {
-        _context = &ctx;
-        defer({
-            _context = nullptr;
-        });
-
+        Ego.context = std::move(ctx);
         sock.setBuffering(false);
 
         try {
@@ -69,10 +65,10 @@ namespace suil::rpc::srpc {
         try {
             if (method <= 0) {
                 // extension request
-                _context->handleExtension(Ego, resp, req, id, method);
+                context->handleExtension(Ego, resp, req, id, method);
             }
             else {
-                (*_context)(resp, req, id, method);
+                (*context)(resp, req, id, method);
             }
         }
         catch (...) {

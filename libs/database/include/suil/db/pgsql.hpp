@@ -7,7 +7,6 @@
 
 
 #include "suil/db/orm.hpp"
-#include "redis.hpp"
 
 #include <suil/base/blob.hpp>
 #include <suil/base/channel.hpp>
@@ -1023,7 +1022,7 @@ namespace suil::db {
             return connection();
         }
 
-        Connection& connection();
+        Connection& connection(bool cached = true);
 
         template<typename... Opts>
         void init(const String& connStr, Opts... opts) {
@@ -1063,7 +1062,7 @@ namespace suil::db {
 
         static coroutine void cleanup(PgSqlDb& db);
 
-        void free(Connection* conn);
+        void free(Connection* conn, bool cached);
 
         struct conn_handle_t {
             PGconn  *conn;
@@ -1082,11 +1081,9 @@ namespace suil::db {
         bool             async{false};
         int64_t          keepAlive{-1};
         int64_t          timeout{-1};
-        mill::Mutex      connsMutex;
-        mill::Event      pruneEvent;
-        std::atomic_bool cleaning{false};
-        std::atomic_bool aborting{false};
-        String        connectionStr{};
+        Channel<uint8_t> notify{1};
+        bool          cleaning{false};
+        String        connectionStr;
         String        dbname{"public"};
     };
 }

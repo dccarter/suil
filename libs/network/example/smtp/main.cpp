@@ -54,12 +54,6 @@ void composEmail(net::Email& msg)
     msg.setContentType("text/html");
 }
 
-static void dump()
-{
-    msleep(suil::Deadline{5000});
-    goredump();
-}
-
 void sendUsingOutbox()
 {
     smtp::SmtpOutbox outbox("127.0.0.1", 5000, {"lol@gmail.com"});
@@ -85,16 +79,13 @@ void sendUsingOutbox()
     outbox.send(msg1);
     outbox.send(msg2);
     outbox.send(msg3);
-    outbox.send(msg4, suil::Deadline{100});
-    // go(dump());
-    msleep(suil::Deadline{5000});
-    int a = 0;
-    printf("Messages sent...");
+    outbox.send(msg4);
+    msleep(suil::Deadline{15000});
 }
 
 int main(int argc, char *argv[])
 {
-    if (argc > 1) {
+    if (argc == 1) {
         auto context = std::make_shared<smtp::ServerContext>();
         net::ServerConfig config;
         config.socketConfig = net::TcpSocketConfig{

@@ -19,7 +19,6 @@
 
 #include <list>
 #include <set>
-#include <libmill/libmill.hpp>
 
 namespace suil::net::smtp {
 
@@ -166,17 +165,16 @@ namespace suil::net::smtp {
             MOVE_CTOR(Composed);
             MOVE_ASSIGN(Composed);
 
-            mill::Event& sync();
+            Channel<char*>& sync();
             Email& email();
             int64_t timeout();
 
         private:
             friend SmtpOutbox;
             Email::Ptr  mEmail{nullptr};
-            mill::Event evSync{};
+            Channel<char*> mSync{(char *)1};
             int64_t     mTimeout{-1};
-            std::atomic_bool isCancelled{false};
-            String      failureMsg{};
+            bool isWaiting{false};
         };
     public:
         sptr(SmtpOutbox);
@@ -194,32 +192,24 @@ namespace suil::net::smtp {
 
         template <typename ...Params>
         void setup(String server, int port, Params... params) {
-            bool expected{false};
-            if (_setup.compare_exchange_strong(expected, true)) {
-                mill::Lock lk{_mutex};
-                Ego.client.setup(std::move(server), port);
-                auto opts = iod::D(params...);
-                sendTimeout = opts.get(var(timeout), sendTimeout);
-            }
+            Ego.client.setup(std::move(server), port);
+            auto opts = iod::D(params...);
+            sendTimeout = opts.get(var(timeout), sendTimeout);
         }
 
-        static Email::Ptr draft(const String& to, const String& subject) ;
+        Email::Ptr draft(const String& to, const String& subject) const;
 
         String send(Email::Ptr email, int64_t timeout = -1);
 
     private:
         static coroutine void sendOutbox(SmtpOutbox& Self);
-        bool isQueueEmpty();
-        Composed::Ptr popNextQueued();
         using SendQueue = std::list<Composed::Ptr>;
         SendQueue sendQ{};
         Client client{};
         Email::Address sender;
         std::int64_t sendTimeout{-1};
         bool quiting{false};
-        std::atomic_bool _sending{false};
-        std::atomic_bool _setup{false};
-        mill::Mutex _mutex;
+        bool sending{false};
     };
 }
 

@@ -6,7 +6,6 @@
 #define SUILRPC_SIGNAL_HPP
 
 #include <suil/base/utils.hpp>
-#include <libmill/libmill.hpp>
 
 #include <memory>
 #include <list>
@@ -33,18 +32,11 @@ namespace suil {
 
         void disconnect() {
             if (func != nullptr) {
-                func->_removed = true;
                 func = nullptr;
             }
         }
 
-        ~Connection() {
-            disconnect();
-        }
-
-        inline operator bool() const {
-            return  func != nullptr and func->_removed;
-        }
+        operator bool() const { return  func != nullptr; }
 
     private:
         template <typename T>
@@ -65,7 +57,7 @@ namespace suil {
 
             R operator()(Args... args)
             {
-                if (!_removed and fn != nullptr) {
+                if (fn) {
                     if constexpr (std::is_same_v<bool, R>) {
                         return std::invoke(fn, args...);
                     } else {
@@ -78,7 +70,6 @@ namespace suil {
             }
 
             Func fn{};
-            std::atomic_bool _removed{false};
         };
 
         std::shared_ptr<Function> func{nullptr};
@@ -104,7 +95,7 @@ namespace suil {
          */
         class ConnectionId {
         public:
-            inline operator bool () const {
+            operator bool () const {
                 return !mConn.expired();
             }
 
@@ -126,7 +117,6 @@ namespace suil {
         Connection<R(Args...)> connect(Func func)
         {
             Connection<R(Args...)> conn(std::move(func));
-            mill::Lock lk{mutex};
             callbacks.emplace_back(conn.func);
             return conn;
         }
@@ -139,7 +129,6 @@ namespace suil {
          */
         ConnectionId operator+=(Func func) {
             auto conn = LifeTimeObserver{new Connection<R(Args...)>(std::move(func))};
-            mill::Lock mtx{mutex};
             callbacks.emplace_back(conn->func);
             lifeTimeObservers.push_back(conn);
             return ConnectionId{conn};
@@ -151,13 +140,11 @@ namespace suil {
          */
         void disconnect(ConnectionId& id)
         {
-            mill::Lock lk{mutex};
             if (auto connId = id.mConn.lock()) {
                 auto it = lifeTimeObservers.begin();
                 while (it != lifeTimeObservers.end()) {
                     if ((*it).get() ==  connId.get()) {
-                        lifeTimeObservers.erase(it);
-                        break;
+                        it = lifeTimeObservers.erase(it);
                     }
                     else {
                         it = std::next(it, 1);
@@ -168,37 +155,26 @@ namespace suil {
 
         void operator()(Args... args)
         {
-            std::vector<std::shared_ptr<typename Callback::element_type>> snapshot;
-            {
-                // take a snapshot of the callback
-                mill::Lock lk{mutex};
-                auto it = callbacks.begin();
-                while (it != callbacks.end()) {
-                    auto& cb = *it;
-                    if (auto callback = cb.lock()) {
-                        snapshot.push_back(std::move(callback));
-                        it = std::next(it, 1);
-                    } else {
-                        // erase obsolete callbacks
-                        it = callbacks.erase(it);
-                    }
-                }
-            }
-
-            auto its = snapshot.begin();
-            while (its != snapshot.end()) {
+            auto it = callbacks.begin();
+            while (it != callbacks.end()) {
                 // invoke all callbacks
-                auto& cb = *its;
-                if constexpr (std::is_same_v<R, bool>) {
-                    if (!(*cb)(args...)) {
-                        // aborted by delegate
-                        break;
+                auto& cb = *it;
+                if (auto callback = cb.lock()) {
+                    if constexpr (std::is_same_v<R, bool>) {
+                        if (!(*callback)(args...)) {
+                            // aborted by delegate
+                            break;
+                        }
                     }
+                    else {
+                        (*callback)(args...);
+                    }
+                    it = std::next(it, 1);
+                    continue;
                 }
-                else {
-                    (*cb)(args...);
-                }
-                its = std::next(its, 1);
+
+                // erase obsolete callbacks
+                it = callbacks.erase(it);
             }
         }
 
@@ -207,10 +183,9 @@ namespace suil {
         }
 
     private suil_ut:
-        std::list<Callback> callbacks{};
+        std::list<Callback> callbacks;
         // Life observers
-        std::vector<LifeTimeObserver> lifeTimeObservers{};
-        mill::Mutex mutex;
+        std::vector<LifeTimeObserver> lifeTimeObservers;
     };
 }
 #endif //SUILRPC_OBSERVABLE_HPP

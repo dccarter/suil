@@ -21,33 +21,33 @@ jobs:
       - uses: actions/checkout@v2
       # Create a build directory
       - name: Create Build Environment
-        run: cmake -E make_directory build-${{ matrix.type }}
+        run: cmake -E make_directory ${{runner.workspace}}/build-${{ matrix.type }}
 
       # Configure CMake project
       - name: Configure CMake
         shell: bash
         run: |
-          cd build-${{ matrix.type }}
-          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} -DCMAKE_INSTALL_PREFIX=artifacts/${{ matrix.type }}
+          cd ${{runner.workspace}}/build-${{ matrix.type }}
+          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${{ matrix.type }} -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/artifacts/${{ matrix.type }}
 
       # Build project dependencies
       - name: Build Dependecies
         shell: bash
         run: |
-          cd build-${{ matrix.type }}
+          cd ${{runner.workspace}}/build-${{ matrix.type }}
           make catch -j4
 
       # Build project
       - name: Build
         shell: bash
         run: |
-          cd build-${{ matrix.type }}
+          cd ${{runner.workspace}}/build-${{ matrix.type }}
           make -j4 install
 
       - name: UnitTests
         shell: bash
         run: |
-          cd build-${{ matrix.type }}
+          cd ${{runner.workspace}}/build-${{ matrix.type }}
           ./libs/base/base_unittest -r junit -o base_unittest.xml
           ./libs/network/net_unittest -r junit -o net_unittest.xml
           ./libs/database/db_unittest -r junit -o db_unittest.xml
@@ -59,5 +59,5 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: unit-test-results
-          path: build-${{ matrix.type }}/*.xml
+          path: ${{runner.workspace}}/build-${{ matrix.type }}/*.xml
           retention-days: 1

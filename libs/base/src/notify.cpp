@@ -28,8 +28,9 @@ namespace suil::fs {
         _signals.clear();
 
         if (_watching) {
-            // wait for reader to coroutine to finish
-            _cond.wait();
+            // Wait for watcher to finish
+            Sync sync;
+            _cond.wait(sync);
         }
     }
 

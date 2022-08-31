@@ -15,7 +15,7 @@ namespace suil::net::smtp {
 
     class ServerHandler : LOGGER(SMTP_SERVER) {
     public:
-        void operator()(Socket& sock, ServerContext& context);
+        void operator()(Socket& sock, std::shared_ptr<ServerContext> context);
     };
 
     class Server : public net::Server<ServerHandler, ServerContext>, LOGGER(SMTP_SERVER) {

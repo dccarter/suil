@@ -44,8 +44,8 @@ namespace suil::http::server {
             configure(options, connStr);
         }
 
-        inline db::PgSqlConnection& conn() {
-            return Ego._db.connection();
+        inline db::PgSqlConnection& conn(bool cached = true) {
+            return Ego._db.connection(cached);
         }
 
     private:
