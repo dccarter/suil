@@ -151,5 +151,5 @@ int main(int argc, char *argv[])
         resp.end();
     });
 
-    return ep.start(3);
+    return ep.start(opt(nprocs, 3));
 }

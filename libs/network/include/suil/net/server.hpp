@@ -18,6 +18,7 @@ namespace suil::net {
     ServerSocket::UPtr createAdaptor(const SocketConfig& config);
     bool adaptorListen(ServerSocket& adaptor, const SocketConfig& config, int backlog);
     String getAddress(const SocketConfig& config);
+    using Postfork = std::function<void(uint32)>;
 
     template <typename Handler, class Context = void>
     class Server: LOGGER(SERVER) {
@@ -55,35 +56,47 @@ namespace suil::net {
 
         template <typename... Opts>
         int start(Opts... opts) {
+            struct {
+                uint32 nprocs{0};
+                Postfork postfork{nullptr};
+            } config;
+
             if ((Adaptor == nullptr) || !Adaptor->isRunning()) {
                 // create socket adaptor
                 if (!listen()) {
                     return errno;
                 }
             }
+            applyConfig(config, std::forward<Opts>(opts)...);
 
-            if (nprocs == 0) {
-                nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+            if (config.nprocs == 0) {
+                // By default the server will use all the available CPU threads
+                config.nprocs = sysconf(_SC_NPROCESSORS_ONLN);
             }
 
-            if (nprocs == 1) {
+            if (config.nprocs == 1) {
                 int status = accept();
                 idebug("Server exiting {status=%d}", status);
                 return status;
             }
 
-            idebug("Starting %u server processes", nprocs);
+            idebug("Server starting %u workers", config.nprocs);
 
-            for (int i = 0; i < nprocs; i++) {
+            for (uint32 i = 0; i < config.nprocs; i++) {
                 auto pid = mfork();
                 if (pid > 0) {
-                    idebug("Server process started {pid=%d}", pid);
+                    idebug("Server worker-%u started {pid=%d}", i, pid);
                     continue;
                 }
 
                 prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+                if (config.postfork) {
+                    config.postfork(i);
+                }
+
                 int status = accept();
-                idebug("Server process exiting {status=%d}", i, status);
+                idebug("Server worker-%u exiting {status=%d}", i, status);
                 return status;
             }
 
@@ -95,7 +108,7 @@ namespace suil::net {
                 if (pid <= 0)
                     break;
                 ret = status == EXIT_SUCCESS? ret : status;
-                idebug("server process exited {pid=%d, status=%d}", pid, status);
+                idebug("Server worker exited {pid=%d, status=%d}", pid, status);
             }
 
             return ret;

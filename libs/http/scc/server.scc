@@ -17,6 +17,8 @@
 #pragma symbol onDisconnect
 #pragma symbol onMessage
 #pragma symbol blockingBroadcast
+#pragma symbol nprocs
+#pragma symbol postfork
 
 #pragma symbol MinChars
 #pragma symbol MaxChars
