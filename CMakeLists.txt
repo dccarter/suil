@@ -88,7 +88,9 @@ include(FetchContent)
 # Fetch libmill library
 FetchContent_Declare(
         libmill
-        GIT_REPOSITORY https://gitlab.com/sw-devel/thirdparty/libmill.git)
+        GIT_REPOSITORY https://gitlab.com/sw-devel/thirdparty/libmill.git
+#        GIT_TAG demos
+)
 
 # Fetch Iod project
 FetchContent_Declare(

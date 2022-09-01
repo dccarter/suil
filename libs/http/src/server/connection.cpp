@@ -201,7 +201,7 @@ namespace suil::http::server {
         }
 
         if (!Ego.writeResponse(sb)) {
-            iwarn("%s sending data to socked failed: %s", Ego._sock.id(), errno_s);
+            iwarn("%s sending data to socket failed: %s", Ego._sock.id(), errno_s);
             Ego._close = true;
             resp.clear();
         }

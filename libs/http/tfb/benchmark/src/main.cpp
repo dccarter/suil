@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
         }
 
         {
-            suil::db::PgSqlTransaction txn(conn.get());
+            suil::db::PgSqlTransaction txn(conn.get(), false);
             txn.begin();
 
             // Sorting transactions to avoid postgres deadlock
@@ -145,6 +145,8 @@ int main(int argc, char *argv[])
             for (auto& obj: objects) {
                 orm.update(obj);
             }
+
+            txn.commit();
         }
 
         resp.append(objects);

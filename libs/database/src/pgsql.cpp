@@ -101,7 +101,7 @@ namespace suil::db {
             return;
         }
 
-        itrace("destroying Connection dctor %d %d", dctor, refs);
+        itrace("destroying Connection {dctor=%d, refs=%d}", dctor, refs);
         if (async) {
             PGresult *res;
             while ((res = PQgetResult(conn)) != nullptr)
@@ -125,8 +125,8 @@ namespace suil::db {
         }
     }
 
-    PgSqlTransaction::PgSqlTransaction(PgSqlConnection& conn)
-        : conn{conn}
+    PgSqlTransaction::PgSqlTransaction(PgSqlConnection& conn, bool autoCommit)
+        : autoCommit{autoCommit}, conn{conn}
     {}
 
     bool PgSqlTransaction::begin()
@@ -175,7 +175,8 @@ namespace suil::db {
 
     PgSqlTransaction::~PgSqlTransaction() noexcept
     {
-        Ego.commit();
+        if (autoCommit)
+            Ego.commit();
         conn.put();
     }
 

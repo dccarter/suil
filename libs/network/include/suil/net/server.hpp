@@ -105,8 +105,10 @@ namespace suil::net {
             while (true) {
                 int status = EXIT_SUCCESS;
                 auto pid = wait(&status);
-                if (pid <= 0)
+                if (pid <= 0) {
+                    idebug("What the hell happened? %d", pid);
                     break;
+                }
                 ret = status == EXIT_SUCCESS? ret : status;
                 idebug("Server worker exited {pid=%d, status=%d}", pid, status);
             }

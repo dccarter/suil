@@ -297,10 +297,41 @@ namespace suil::db {
 
     class PgSqlStatement final : LOGGER(PGSQL_CONN) {
     public:
+        using ErrorCallback = std::function<void(void)>;
         PgSqlStatement(PGconn *conn, String stmt, bool async, std::int64_t timeout = -1);
 
         template <typename... Args>
         auto& operator()(Args&&... args)
+        {
+            try {
+                return execute(std::forward<Args>(args)...);
+            }
+            catch (...) {
+                // reset connection on error and re-clear
+                PQreset(conn);
+                throw;
+            }
+        }
+
+        template <typename... Args>
+        auto& executeWithCallback(ErrorCallback ec, Args&&... args)
+        {
+            try {
+                return execute(std::forward<Args>(args)...);
+            }
+            catch (...) {
+                // reset connection on error
+                PQreset(conn);
+
+                if (ec != nullptr)
+                    ec();
+
+                throw;
+            }
+        }
+
+        template <typename... Args>
+        auto& execute(Args&&... args)
         {
             const size_t size = sizeof...(Args)+1;
             const char *values[size] = {nullptr};
@@ -417,9 +448,10 @@ namespace suil::db {
 
                 if (err) {
                     /* error occurred and was reported in logs */
-                    fdclean(sock);
-                    PQreset(conn);
-                    throw PgSqlException("[", sock, "] query failed: ", PQerrorMessage(conn));
+                    fdclear(sock);
+                    auto msg = PQerrorMessage(conn);
+                    throw PgSqlException("[", sock, "] query failed: ",
+                                         (msg != nullptr && msg[0] != '\0')? msg: strerror(errno));
                 }
 
                 itrace("[%d] ASYNC QUERY: received %d results", sock, results.results.size());
@@ -977,7 +1009,7 @@ namespace suil::db {
 
     class PgSqlTransaction final: LOGGER(PGSQL_CONN) {
     public:
-        PgSqlTransaction(PgSqlConnection& conn);
+        PgSqlTransaction(PgSqlConnection& conn, bool autoCommit = true);
 
         DISABLE_COPY(PgSqlTransaction);
         DISABLE_MOVE(PgSqlTransaction);
@@ -998,7 +1030,7 @@ namespace suil::db {
             try {
                 // execute the statement
                 auto stmt = conn(std::move(query));
-                status = stmt(args...).status();
+                status = stmt.executeWithCallback([&](){ valid = false; }, args...).status();
             }
             catch (...) {
                 ierror("transaction failed: %s", Exception::fromCurrent().what());
@@ -1010,6 +1042,7 @@ namespace suil::db {
         ~PgSqlTransaction();
     private:
         bool valid{false};
+        bool autoCommit{true};
         PgSqlConnection& conn;
     };
 
