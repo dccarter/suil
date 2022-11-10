@@ -154,6 +154,10 @@ namespace suil {
                               name, getpid(), Datetime()(), LOGLVL_STR[(unsigned char) l],
                               tag);
                 break;
+            case Level::TRACE:
+                wr = snprintf(tmp, sz, "%s/%05d: ",
+                              name, getpid());
+                break;
             default:
                 wr = snprintf(tmp, sz, "%s: ", name);
                 break;

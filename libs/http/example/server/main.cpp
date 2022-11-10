@@ -34,6 +34,7 @@ const suil::UnorderedMap<User> users = {
 
 int main(int argc, char *argv[])
 {
+    suil::setup(opt(verbose, 0));
     ipc::init(opt(nworkers, 2));
 
     using Server = hs::Endpoint<

@@ -161,6 +161,8 @@ namespace suil {
          */
         Data copy() const;
 
+        Data own();
+
         /**
          * Releases ownership of the underlying buffer
          * @return

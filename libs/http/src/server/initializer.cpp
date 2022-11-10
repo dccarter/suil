@@ -32,8 +32,7 @@ namespace suil::http::server {
 
     void Initializer::enable(Router& router)
     {
-        sdebug("Enabling all routes");   
-        if (!Ego._blocked) {
+        if (Ego._blocked) {
             Ego._blocked = true;
             router | [&](BaseRule& rule) -> bool {
                 if (Ego._initRoute == rule.id()) {

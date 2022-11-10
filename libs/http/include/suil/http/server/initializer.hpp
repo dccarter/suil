@@ -48,8 +48,6 @@ namespace suil::http::server {
         friend auto& Initialize(Endpoint<Mws...>& ep);
         void enable(Router& router);
 
-        void init(const Request& req, Response& resp);
-
         std::atomic_bool     _blocked{false};
         uint32   _initRoute{0};
     };
@@ -59,9 +57,8 @@ namespace suil::http::server {
     {
         auto& initializer = ep.template middleware<Initializer>();
         ipc::registerHandler(INITIALIZER_ENABLE, 
-        [&](uint8 /*unsued*/, void * /*unused*/, size_t /*unused*/) -> bool {
+        [&](uint8 /*unsued*/, Data& data) {
             initializer.enable(ep.router());
-            return false;
         });
         return initializer.setup(ep);
     }

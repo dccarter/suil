@@ -254,6 +254,10 @@ namespace suil {
             return *this;
         }
 
+        const chan handle() const {
+            return ch;
+        }
+
         /**
          * the destructor will close and destroy the underlying channel
          */

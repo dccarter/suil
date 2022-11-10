@@ -106,6 +106,11 @@ namespace suil {
         return std::move(tmp);
     }
 
+    Data Data::own() {
+        if (Ego.m_own) return std::move(Ego);
+        return Ego.copy();
+    }
+
     void Data::clear() {
         if (Ego.m_own && Ego.m_data) {
             delete [] Ego.m_data;

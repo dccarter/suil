@@ -8,6 +8,7 @@
 #include "suil/http/server/response.hpp"
 #include "suil/http/server/request.hpp"
 
+#include <suil/base/ipc.hpp>
 #include <suil/base/sio.hpp>
 #include <suil/base/string.hpp>
 
@@ -21,6 +22,12 @@ namespace suil::http::server {
 
         template <typename  E>
         static void setup(E& ep, const String& auth = "System-Admin") {
+
+            ipc::registerGetHandler(GET_STATS, [&](void *token, int src) {
+                auto& stats = ep.stats();
+                ipc::sendGetResponse(token, src, &stats, sizeof(stats));
+            });
+
             ldebug(&ep, "initializing administration endpoint");
             // Use dynamic routes
             ep("/_admin/routes")
@@ -83,7 +90,13 @@ namespace suil::http::server {
             ("GET"_method, "OPTIONS"_method)
             .attrs(opt(Authorize, Auth{auth.dup()}))
             ([&ep]{
-                return ep.stats();
+                std::vector<HttpServerStats> stats{};
+                stats.push_back(ep.stats());
+                auto all = ipc::gather(GET_STATS);
+                for (auto& proc: all) {
+                    stats.push_back(*((HttpServerStats *)proc.data()));
+                }
+                return stats;
             });
         }
 

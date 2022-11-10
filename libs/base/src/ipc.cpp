@@ -74,6 +74,8 @@ namespace suil {
 
     static std::vector<CleanUpHandler> cleanupHandlers;
 
+    struct IPCGetHandle
+
     static inline bool hasMessageHandler(uint8_t w, uint8_t m) {
         Worker& wrk   = IPC->workers[w];
         if(w <= IPC->nworkers && wrk.active) {
@@ -129,7 +131,7 @@ namespace suil {
 
         static int workerWait(bool last);
 
-        static coroutine void invokeHandler(MessageHandler h, uint8 src, Data&& data);
+        static coroutine void invokeHandler(MessageHandler& h, uint8 src, Data&& data, void *toke);
 
         static int waitRead(int fd, int64 timeout = -1) {
             int64 tmp = timeout < 0? -1 : mnow() + timeout;
@@ -714,9 +716,7 @@ namespace suil {
             }
 
             // handle ipc message
-            MessageHandler h = ipcHandlers[hdr.id];
-
-            go(invokeHandler(h, hdr.src, std::move(b)));
+            go(invokeHandler(ipcHandlers[hdr.id], hdr.src, std::move(b), &hdr));
 
             return 0;
         }
@@ -843,6 +843,8 @@ namespace suil {
                 payload.size = 0;
                 ipc::broadcast(msg, &payload, sizeof(payload));
 
+                ipc::spinUnlock(SHM_GATHER_LOCK);
+
                 // receive the Response
                 std::vector<Data> all;
                 ltrace(WLOG, "sent gather Request waiting for %hhu responses in %ld ms",
@@ -857,7 +859,6 @@ namespace suil {
                     lwarn(WLOG, "gather failed, msg %hhu", msg);
                 }
 
-                ipc::spinUnlock(SHM_GATHER_LOCK);
                 /* return gathered results */
                 return all;
             } else {
@@ -907,7 +908,7 @@ namespace suil {
             ipc::registerHandler(msg,
                            [&handler](uint8_t src, Data& data) {
                                /* invoke the handler with the buffer as the token */
-                               handler(std::move(data), src);
+                               handler(data.data(), src);
                            });
         }
 
@@ -915,24 +916,27 @@ namespace suil {
             ipc::registerHandler(GET_RESPONSE,
                            [&](uint8_t src, Data& data) {
                                auto *payload = (IPCGetPayload *) data.data();
-                               /* go 500 ms ahead in time */
-                               int64_t tmp = mnow() + 500;
+                               /* go 250 ms ahead in time */
+                               int64_t tmp = mnow() + 250;
                                if (payload->deadline > tmp) {
-                                   ltrace(WLOG, "got Response in time deadline:%ld now:%ld",
+                                   ltrace(WLOG, "got response in time deadline:%ld now:%ld",
                                           payload->deadline, tmp);
-                                   /*we haven't timed out waiting for Response */
+                                   /* we haven't timed out waiting for response, assume
+                                    * ownership of the buffer */
                                    IPCGetHandle *async = payload->handle;
-                                   (*async) << std::move(data);
+                                   (*async) << Data(data.data(),
+                                                    data.size(),
+                                                    sizeof(IPCGetPayload),
+                                                    data.owns()).own();
                                }
                                else {
-                                   lwarn(WLOG, "got Response from %hhu after timeout dd %ld now %ld",
+                                   lwarn(WLOG, "got response from %hhu after timeout dd %ld now %ld",
                                          src, payload->deadline, tmp);
-                                   return false;
                                }
                            });
         }
 
-        coroutine void invokeHandler(MessageHandler handler, uint8 src, Data&& data)
+        coroutine void invokeHandler(MessageHandler& handler, uint8 src, Data&& data, void *token)
         {
             try {
                 handler(src, data);

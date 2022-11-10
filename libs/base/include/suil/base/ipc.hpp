@@ -116,7 +116,8 @@ namespace suil {
 #define SYSTEM                  64
     };
 
-    using IPCGetHandle = Channel<Data, 16>;
+    using IPCGetHandle = Channel<uint8, 16>;
+
     struct IPCGetPayload {
         IPCGetHandle *handle;
         int64        deadline;
@@ -124,7 +125,7 @@ namespace suil {
         uint8        data[0];
     } __attribute((packed));
 
-    using IPCGetHandler = std::function<void(Data, uint8)>;
+    using IPCGetHandler = std::function<void(void *, uint8)>;
 
     #define NWORKERS_SYSTEM (0xff)
 
