@@ -161,7 +161,7 @@ namespace suil {
          */
         Data copy() const;
 
-        Data own();
+        Data own(uint32 offset = 0);
 
         /**
          * Releases ownership of the underlying buffer

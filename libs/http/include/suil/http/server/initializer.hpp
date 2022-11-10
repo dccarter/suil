@@ -57,8 +57,9 @@ namespace suil::http::server {
     {
         auto& initializer = ep.template middleware<Initializer>();
         ipc::registerHandler(INITIALIZER_ENABLE, 
-        [&](uint8 /*unsued*/, Data& data) {
+        [&](uint8 /*unsued*/, uint8 * /*unused*/, size_t /*unused*/, bool /* unused */) {
             initializer.enable(ep.router());
+            return false;
         });
         return initializer.setup(ep);
     }

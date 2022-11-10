@@ -33,7 +33,7 @@ namespace suil::http::server {
     void Initializer::enable(Router& router)
     {
         if (Ego._blocked) {
-            Ego._blocked = true;
+            Ego._blocked = false;
             router | [&](BaseRule& rule) -> bool {
                 if (Ego._initRoute == rule.id()) {
                     rule._attrs.Enabled = false;

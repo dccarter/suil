@@ -119,7 +119,7 @@ namespace suil {
     using IPCGetHandle = Channel<uint8, 16>;
 
     struct IPCGetPayload {
-        IPCGetHandle *handle;
+        chan         handle;
         int64        deadline;
         size_t       size;
         uint8        data[0];
@@ -131,7 +131,7 @@ namespace suil {
 
 #define IPC_MSG(msg)  (suil::SystemMessage::MSG_SYSTEM + msg)
 
-    using MessageHandler = std::function<void(uint8, Data&)>;
+    using MessageHandler = std::function<bool(uint8, uint8*, size_t, bool)>;
     using Work = std::function<int(void)>;
     using PostSpawnFunc = std::function<int(uint8)>;
     using CleanUpHandler = std::function<void(void)>;

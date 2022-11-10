@@ -72,9 +72,9 @@ namespace suil {
 
     static  MessageHandler ipcHandlers[256] = {nullptr};
 
-    static std::vector<CleanUpHandler> cleanupHandlers;
-
-    struct IPCGetHandle
+    static std::vector<CleanUpHandler> cleanupHandlers{};
+    using InflightGetData = std::vector<Data>;
+    static std::unordered_map<chan, InflightGetData> inflightGets{};
 
     static inline bool hasMessageHandler(uint8_t w, uint8_t m) {
         Worker& wrk   = IPC->workers[w];
@@ -131,7 +131,7 @@ namespace suil {
 
         static int workerWait(bool last);
 
-        static coroutine void invokeHandler(MessageHandler& h, uint8 src, Data&& data, void *toke);
+        static coroutine void invokeHandler(MessageHandler h, uint8 src, uint8 *data, size_t len, bool own);
 
         static int waitRead(int fd, int64 timeout = -1) {
             int64 tmp = timeout < 0? -1 : mnow() + timeout;
@@ -304,6 +304,7 @@ namespace suil {
                 if (n)
                     cpu = (uint8) ((cpu +1) % ncpus);
             }
+            registerGetResponse();
 
             return;
 
@@ -352,7 +353,6 @@ namespace suil {
                     // start post spawn delegate
                     try {
                         quit = ps(spid);
-                        registerGetResponse();
                     }
                     catch(...) {
                         lerror(WLOG, "unhandled exception in post spawn delegate");
@@ -552,7 +552,7 @@ namespace suil {
             }
         }
 
-        coroutine void asyncBroadcast(uint8 msg, Data&& data)
+        coroutine void asyncBroadcast(uint8 msg, uint8 *data, size_t len)
         {
             // for each worker send the message
             int wait = 0;
@@ -560,13 +560,13 @@ namespace suil {
 
             // send asynchronously
             ltrace(WLOG, "async_broadcast msg %02X data %p, len %lu",
-                            msg, data.data(), data.size());
+                            msg, data, len);
 
             for(uint8_t i = 1; i <= IPC->nworkers; i++) {
                 if (i != spid && hasMessageHandler(i, msg)) {
                     // send to all other worker who are interested in the message
                     wait++;
-                    go(asyncSend(async, i, msg, data.data(), data.size()));
+                    go(asyncSend(async, i, msg, data, len));
                 }
             }
 
@@ -575,16 +575,18 @@ namespace suil {
                 ltrace(WLOG, "message %02X sent to %hhu", msg, dst);
             };
 
-            ltrace(WLOG, "messages sent, free data dup %p, %lu",  data.data(), mnow());
+            ltrace(WLOG, "messages sent, free data dup %p, %lu",  data, mnow());
+            if (data)
+                delete[] data;
         }
 
         void broadcast(uint8_t msg, const void *data, size_t len) {
-            auto copy = Data(data, len, false).copy();
+            auto copy = Data(data, len, false).copy().release();
             ltrace(WLOG, "worker::broadcast dup %p msg %02X, data %p len %lu",
-                   copy.data(), msg, data, len);
+                   copy, msg, data, len);
 
             // start a go-routine to broadcast the message to all workers
-            go(asyncBroadcast(msg, std::move(copy)));
+            go(asyncBroadcast(msg, copy, len));
         }
 
         uint8 broadcast(Channel<int> &ch, uint8 msg, const void *data, size_t len) {
@@ -664,20 +666,22 @@ namespace suil {
 
             ltrace(WLOG, "received header [%02X|%02X|%08X]", hdr.id, hdr.src, hdr.len);
             // receive message body
-            Data b;
+            uint8 *data{nullptr};
+            bool allocd{false};
             size_t tread = 0;
 
             if (hdr.len) {
                 if (hdr.len < 255) {
                     // no need to allocate memory for this
-                    char RX_BUF[256];
-                    b = {RX_BUF, hdr.len, false};
+                    uint8 RX_BUF[256];
+                    data = RX_BUF;
                 }
                 else {
-                    b = {hdr.len};
+                    data = new uint8[hdr.len];
+                    allocd = true;
                 }
 
-                void *ptr = b.data();
+                void *ptr = data;
 
                 do {
                     size_t len = MIN(PIPE_BUF, (hdr.len - tread));
@@ -716,7 +720,10 @@ namespace suil {
             }
 
             // handle ipc message
-            go(invokeHandler(ipcHandlers[hdr.id], hdr.src, std::move(b), &hdr));
+            MessageHandler h = ipcHandlers[hdr.id];
+            ltrace(WLOG, "invoking handler with [handler:%p|data:%p|len:%lu|allocd:%d",
+                         h, data, tread, allocd);
+            go(invokeHandler(h, hdr.src, data, tread, allocd));
 
             return 0;
         }
@@ -754,7 +761,7 @@ namespace suil {
             if (msg <= IPC_MAX_NUMBER_OF_MESSAGES) {
                 ipcHandlers[msg] = handler;
                 if (spid == SPID_PARENT) {
-                    for (uint8 w = 1; w < IPC->nworkers; w++) {
+                    for (uint8 w = 1; w <= IPC->nworkers; w++) {
                         setMessageHandler(w, msg, true);
                     }
                 }
@@ -770,7 +777,7 @@ namespace suil {
             if (msg <= IPC_MAX_NUMBER_OF_MESSAGES) {
                 ipcHandlers[msg] = nullptr;
                 if (spid == SPID_PARENT) {
-                    for (uint8 w = 1; w < IPC->nworkers; w++) {
+                    for (uint8 w = 1; w <= IPC->nworkers; w++) {
                         setMessageHandler(w, msg, false);
                     }
                 }
@@ -805,21 +812,28 @@ namespace suil {
 
             IPCGetHandle async(0);
             IPCGetPayload payload{};
+            
+            auto& data = inflightGets.emplace(async.handle(), InflightGetData{}).first->second;
+            data.reserve(1);
 
-            payload.handle = &async;
-            payload.deadline = mnow() + tout;
+            auto handle = async.handle();
+            defer({
+                inflightGets.erase(handle);
+            });
+
+            payload.handle = async.handle();
+            payload.deadline = tout <= 0? Deadline::Inf : mnow() + tout;
             payload.size = 0;
             ipc::send(w, msg, &payload, sizeof(payload));
 
             // receive the Response
-            Data data;
             ltrace(WLOG, "sent get request waiting for 1 Response in %ld ms", tout);
-            bool status = async[tout] >> data;
+            bool status = async[tout] >> w;
 
             if (status && !data.empty()) {
                 /* successfully received data from worker */
                 ltrace(WLOG, "got Response: data %p, size %lu", data.data(), data.size());
-                return data;
+                return std::move(data[0]);
             } else {
                 lerror(WLOG, "get from worker %hhu failed, msg %hhu", w, msg);
             }
@@ -838,29 +852,37 @@ namespace suil {
                 IPCGetHandle async(0);
                 IPCGetPayload payload{};
 
-                payload.handle = &async;
-                payload.deadline = mnow() + tout;
+                auto& data = inflightGets.emplace(async.handle(), InflightGetData{}).first->second;
+                data.reserve(IPC->nworkers-1);
+                auto handle = async.handle();
+
+                defer({ inflightGets.erase(handle); });
+
+                payload.handle = async.handle();
+                payload.deadline = tout <= 0? Deadline::Inf : mnow() + tout;
                 payload.size = 0;
+
                 ipc::broadcast(msg, &payload, sizeof(payload));
 
                 ipc::spinUnlock(SHM_GATHER_LOCK);
 
-                // receive the Response
-                std::vector<Data> all;
-                ltrace(WLOG, "sent gather Request waiting for %hhu responses in %ld ms",
+                // wait for the response from all workers
+                ltrace(WLOG, "sent gather request waiting for %hhu responses in %ld ms",
                        IPC->nactive-1, tout);
 
-                bool status = async[tout](IPC->nactive-1) |
-                              [&](bool /* unsused */, Data data) {
-                                  all.push_back(std::move(data));
-                              };
+                bool status = async[tout](IPC->nactive-1) | Void;
 
                 if (!status) {
                     lwarn(WLOG, "gather failed, msg %hhu", msg);
                 }
 
                 /* return gathered results */
-                return all;
+                auto ret = std::move(data);
+                for (auto& d: ret) {
+                    auto s = hexstr(d.data(), d.size());
+                    strace("data: " PRIs, _PRIs(s));
+                }
+                return std::move(ret);
             } else {
                 lwarn(WLOG, "acquiring SHM_GET_LOCK timed out");
                 return {};
@@ -895,7 +917,7 @@ namespace suil {
 
             if (allocd) {
                 /* free buffer if it was allocated */
-                delete[] (uint8 *)(resp);
+                delete[] (uint8 *) resp;
             }
         }
 
@@ -906,40 +928,55 @@ namespace suil {
             }
 
             ipc::registerHandler(msg,
-                           [&handler](uint8_t src, Data& data) {
+                           [handler](uint8_t src, uint8* data, size_t /*unused*/, bool /*unused*/) {
                                /* invoke the handler with the buffer as the token */
-                               handler(data.data(), src);
+                               ltrace(WLOG, "invoking get handler [handler:%p|token:%p]", handler, data);
+                               handler(data, src);
+                               return false;
                            });
         }
 
         void registerGetResponse() {
             ipc::registerHandler(GET_RESPONSE,
-                           [&](uint8_t src, Data& data) {
-                               auto *payload = (IPCGetPayload *) data.data();
-                               /* go 250 ms ahead in time */
-                               int64_t tmp = mnow() + 250;
-                               if (payload->deadline > tmp) {
-                                   ltrace(WLOG, "got response in time deadline:%ld now:%ld",
-                                          payload->deadline, tmp);
-                                   /* we haven't timed out waiting for response, assume
-                                    * ownership of the buffer */
-                                   IPCGetHandle *async = payload->handle;
-                                   (*async) << Data(data.data(),
-                                                    data.size(),
-                                                    sizeof(IPCGetPayload),
-                                                    data.owns()).own();
-                               }
-                               else {
-                                   lwarn(WLOG, "got response from %hhu after timeout dd %ld now %ld",
-                                         src, payload->deadline, tmp);
-                               }
-                           });
+                        [&](uint8_t src, uint8 *data, size_t len, bool allocd) {
+                            auto *payload = (IPCGetPayload *) data;
+                            /* go 50 ms ahead in time */
+                            auto tmp = mnow() + 50;
+                            if (payload->deadline == Deadline::Inf || payload->deadline > tmp) {
+                                ltrace(WLOG, "got response in time deadline:%ld now:%ld",
+                                        payload->deadline, tmp);
+                                /*we haven't timed out waiting for Response */
+                                chan handle = payload->handle;
+                                auto it = inflightGets.find(handle);
+                                if (it != inflightGets.end()) {
+                                    auto s = hexstr(data, len);
+                                    strace("data: " PRIs, _PRIs(s));
+                                    auto s2 = hexstr(&data[sizeof(IPCGetPayload)-1], len-sizeof(IPCGetPayload));
+                                    strace("data2: " PRIs, _PRIs(s2));
+                                    it->second.push_back(
+                                            Data{data, len-sizeof(IPCGetPayload), allocd}
+                                            .own(sizeof(IPCGetPayload)-1));
+                                    chs(handle, uint8, src);
+                                    return true;
+                                }
+                                else {
+                                    ltrace(WLOG,
+                                        "got response from %hhu without worker", src);
+                                }
+                            }
+                            else {
+                                lwarn(WLOG, "got response from %hhu after timeout dd %ld now %ld",
+                                        src, payload->deadline, tmp);
+                            }
+                            return false;
+                        });
         }
 
-        coroutine void invokeHandler(MessageHandler& handler, uint8 src, Data&& data, void *token)
+        coroutine void invokeHandler(MessageHandler handler, uint8 src, uint8 *data, size_t len, bool own)
         {
             try {
-                handler(src, data);
+                if (!handler(src, data, len, own) && own)
+                    delete[] data;
             } catch(std::exception& ex) {
                 lwarn(WLOG, "un-handled exception in msg handler: %s", ex.what());
             }

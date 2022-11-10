@@ -258,6 +258,10 @@ namespace suil {
             return ch;
         }
 
+        chan handle() {
+            return ch;
+        }
+
         /**
          * the destructor will close and destroy the underlying channel
          */

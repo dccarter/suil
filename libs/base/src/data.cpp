@@ -82,6 +82,7 @@ namespace suil {
         d.m_data = nullptr;
         d.m_size = 0;
         d.m_own  = false;
+        d.m_offset = 0;
     }
 
     Data& Data::operator=(Data&& d) noexcept {
@@ -106,7 +107,8 @@ namespace suil {
         return std::move(tmp);
     }
 
-    Data Data::own() {
+    Data Data::own(uint32 offset) {
+        Ego.m_offset = offset;
         if (Ego.m_own) return std::move(Ego);
         return Ego.copy();
     }

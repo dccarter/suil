@@ -51,7 +51,7 @@ namespace suil::http::server {
         String offloadDir{"./.body"};
     };
 
-    struct [[gen::sbg(json)]] HttpServerStats {
+    struct [[gen::sbg(meta)]] HttpServerStats {
         uint16    pid{0};
         uint64    rxBytes{0};
         uint64    txBytes{0};

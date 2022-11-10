@@ -1,0 +1,22 @@
+@host=0.0.0.0:8000
+@username=admin
+@password=admin123
+
+###
+
+# @name init
+POST http://{{host}}/api/app-init?admin=Admin
+
+
+###
+
+# @name login
+GET http://{{host}}/api/login?username={{username}}&passwd={{password}}
+
+###
+GET http://{{host}}/api/_admin/routes
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+GET http://{{host}}/api/_admin/endpoint/stats
+Authorization: Bearer {{login.response.body.$.accessToken}}
