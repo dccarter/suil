@@ -9,6 +9,7 @@
 #include "suil/http/server/request.hpp"
 #include "suil/http/server/endpoint.hpp"
 
+#include <suil/base/ipc.hpp>
 #include <suil/base/string.hpp>
 
 namespace suil::http::server {
@@ -43,10 +44,26 @@ namespace suil::http::server {
         }
 
     private:
+        template <typename ...Mws>
+        friend auto& Initialize(Endpoint<Mws...>& ep);
+        void enable(Router& router);
+
         void init(const Request& req, Response& resp);
 
         std::atomic_bool     _blocked{false};
         uint32   _initRoute{0};
     };
+
+    template <typename ...Mws>
+    auto& Initialize(Endpoint<Mws...>& ep)
+    {
+        auto& initializer = ep.template middleware<Initializer>();
+        ipc::registerHandler(INITIALIZER_ENABLE, 
+        [&](uint8 /*unsued*/, void * /*unused*/, size_t /*unused*/) -> bool {
+            initializer.enable(ep.router());
+            return false;
+        });
+        return initializer.setup(ep);
+    }
 }
 #endif //SUIL_HTTP_SERVER_INITIALIZER_HPP

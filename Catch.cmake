@@ -2,6 +2,9 @@ set(EP_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps)
 
 include(ExternalProject)
 
+set_directory_properties(PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/3rdParty)
+set(EP_PREFIX  ${CMAKE_BINARY_DIR}/3rdParty)
+
 ExternalProject_Add(catch
         PREFIX ${EP_PREFIX}/catch
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git

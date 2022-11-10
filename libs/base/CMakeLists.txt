@@ -18,6 +18,7 @@ set(SUIL_BASE_SOURCES
         src/exception.cpp
         src/file.cpp
         src/hash.cpp
+        src/ipc.cpp
         src/json.cpp
         src/logging.cpp
         src/mime.cpp

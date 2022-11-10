@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
 set(SUIL_VERSION 0.1.0 CACHE STRING "The god version of suil projects")
 project(Suil
         VERSION ${SUIL_VERSION}
@@ -13,6 +13,7 @@ if (NOT CMAKE_BUILD_TYPE)
     # default build type is Debug
     set(CMAKE_BUILD_TYPE Debug)
 endif()
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wno-address-of-packed-member)
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 

@@ -47,4 +47,9 @@
     iod_define_symbol(onStdOut)
 #endif
 
+#ifndef IOD_SYMBOL_nworkers
+    #define IOD_SYMBOL_nworkers
+    iod_define_symbol(nworkers)
+#endif
+
 #endif //SUIL_BASE_SYMBOLS_HPP

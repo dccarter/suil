@@ -39,13 +39,27 @@ namespace suil {
               m_own(own)
     {}
 
+    Data::Data(const void *data, size_t size, uint32 offset, bool own)
+        : m_cdata((uint8_t*) data),
+          m_size((uint32_t)(size)),
+          m_own(false),
+          m_offset{own}
+    {}
+
+    Data::Data(void *data, size_t size, uint32 offset, bool own)
+        : m_data((uint8_t*) data),
+          m_size((uint32_t)(size)),
+          m_own(true),
+          m_offset{own}
+    {}
+
     Data::Data(const Data& d) noexcept
             : Data()
     {
         if (d.m_size) {
             Ego.m_data = new uint8_t[d.m_size];
             Ego.m_size = d.m_size;
-            memcpy(Ego.m_data, d.m_data, d.m_size);
+            memcpy(Ego.m_data, d.data(), d.m_size);
             Ego.m_own  = true;
         }
     }
@@ -55,7 +69,7 @@ namespace suil {
         if (d.m_size) {
             Ego.m_data = new uint8_t[d.m_size];
             Ego.m_size = d.m_size;
-            memcpy(Ego.m_data, d.m_data, d.m_size);
+            memcpy(Ego.m_data, d.data(), d.m_size);
             Ego.m_own  = true;
         }
 
@@ -63,30 +77,30 @@ namespace suil {
     }
 
     Data::Data(Data&& d) noexcept
-        : Data(d.m_data, d.m_size, d.m_own)
+        : Data(d.m_data, d.m_size, d.m_offset, d.m_own)
     {
         d.m_data = nullptr;
         d.m_size = 0;
-        d.m_own  = 0;
+        d.m_own  = false;
     }
 
     Data& Data::operator=(Data&& d) noexcept {
         Ego.clear();
         Ego.m_data = d.m_data;
         Ego.m_size = d.m_size;
+        Ego.m_offset = d.m_offset;
         Ego.m_own  = d.m_own;
         d.m_data = nullptr;
         d.m_size = 0;
+        d.m_offset = 0;
         d.m_own  = false;
         return Ego;
     }
 
     Data Data::copy() const {
-        Data tmp{};
+        Data tmp{Ego.m_size};
         if (Ego.m_size) {
-            tmp.m_data = new uint8_t[Ego.m_size];
-            tmp.m_size = Ego.m_size;
-            memcpy(tmp.m_data, Ego.m_data, Ego.m_size);
+            memcpy(tmp.m_data, Ego.data(), Ego.m_size);
             tmp.m_own  = true;
         }
         return std::move(tmp);
@@ -98,7 +112,8 @@ namespace suil {
         }
         Ego.m_data = nullptr;
         Ego.m_size = 0;
-        Ego.m_own  = 0;
+        Ego.m_offset = 0;
+        Ego.m_own  = false;
     }
 
     Data bytes(const uint8_t *data, size_t size, bool b64)
@@ -130,7 +145,7 @@ namespace suil {
             throw AccessViolation("requested resize is greater than the buffer size");
         }
         resize = (resize == 0)? m_size : resize;
-        auto tmp = Data{m_data, resize, m_own};
+        auto tmp = Data{m_data, resize, m_offset, m_own};
         m_data = nullptr;
         m_own = false;
         m_size = false;

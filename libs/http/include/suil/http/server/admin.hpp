@@ -108,5 +108,21 @@ namespace suil::http::server {
             return status;
         }
     };
+
+    template <typename ...Mws>
+    void Admin(Endpoint<Mws...>& ep)
+    {
+        EndpointAdmin::setup(ep);
+    }
+
+    template <typename ...Mws>
+    void Ping(Endpoint<Mws...>& ep, const char* route = "/ping")
+    {
+        ep(route)
+        ("GET"_method)
+        ([]{
+            return Status::Ok;
+        });
+    }
 }
 #endif //SUIL_HTTP_SERVER_ADMIN_HPP

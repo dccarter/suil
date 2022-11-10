@@ -277,6 +277,8 @@ namespace suil {
     inline void closepipe(int p[2]) {
         close(p[0]);
         close(p[1]);
+        p[0] = -1;
+        p[1] = -1;
     }
 
 

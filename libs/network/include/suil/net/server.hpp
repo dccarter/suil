@@ -5,6 +5,7 @@
 #ifndef SUILNETWORK_SERVER_HPP
 #define SUILNETWORK_SERVER_HPP
 
+#include <suil/base/ipc.hpp>
 #include "suil/net/socket.hpp"
 #include "suil/net/config.scc.hpp"
 
@@ -54,66 +55,87 @@ namespace suil::net {
             return true;
         }
 
+        // template <typename... Opts>
+        // int start(Opts... opts) {
+        //     struct {
+        //         uint32 nprocs{0};
+        //         Postfork postfork{nullptr};
+        //     } config;
+
+        //     if ((Adaptor == nullptr) || !Adaptor->isRunning()) {
+        //         // create socket adaptor
+        //         if (!listen()) {
+        //             return errno;
+        //         }
+        //     }
+        //     applyConfig(config, std::forward<Opts>(opts)...);
+
+        //     if (config.nprocs == 0) {
+        //         // By default the server will use all the available CPU threads
+        //         config.nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+        //     }
+
+        //     if (config.nprocs == 1) {
+        //         int status = accept();
+        //         idebug("Server exiting {status=%d}", status);
+        //         return status;
+        //     }
+
+        //     idebug("Server starting %u workers", config.nprocs);
+
+        //     for (uint32 i = 0; i < config.nprocs; i++) {
+        //         auto pid = mfork();
+        //         if (pid > 0) {
+        //             idebug("Server worker-%u started {pid=%d}", i, pid);
+        //             continue;
+        //         }
+
+        //         prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+        //         if (config.postfork) {
+        //             config.postfork(i);
+        //         }
+
+        //         int status = accept();
+        //         idebug("Server worker-%u exiting {status=%d}", i, status);
+        //         return status;
+        //     }
+
+        //     // Wait for all workers to exit
+        //     int ret = EXIT_SUCCESS;
+        //     while (true) {
+        //         int status = EXIT_SUCCESS;
+        //         auto pid = wait(&status);
+        //         if (pid <= 0) {
+        //             idebug("What the hell happened? %d", pid);
+        //             break;
+        //         }
+        //         ret = status == EXIT_SUCCESS? ret : status;
+        //         idebug("Server worker exited {pid=%d, status=%d}", pid, status);
+        //     }
+
+        //     return ret;
+        // }
+
         template <typename... Opts>
         int start(Opts... opts) {
-            struct {
-                uint32 nprocs{0};
-                Postfork postfork{nullptr};
-            } config;
-
             if ((Adaptor == nullptr) || !Adaptor->isRunning()) {
                 // create socket adaptor
                 if (!listen()) {
                     return errno;
                 }
             }
-            applyConfig(config, std::forward<Opts>(opts)...);
 
-            if (config.nprocs == 0) {
-                // By default the server will use all the available CPU threads
-                config.nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-            }
-
-            if (config.nprocs == 1) {
+            return ipc::spawn([&]() {
+                // stop the server on exit signal
+                ipc::registerCleaner([&] {
+                    Ego.stop();
+                });
+                
                 int status = accept();
                 idebug("Server exiting {status=%d}", status);
                 return status;
-            }
-
-            idebug("Server starting %u workers", config.nprocs);
-
-            for (uint32 i = 0; i < config.nprocs; i++) {
-                auto pid = mfork();
-                if (pid > 0) {
-                    idebug("Server worker-%u started {pid=%d}", i, pid);
-                    continue;
-                }
-
-                prctl(PR_SET_PDEATHSIG, SIGHUP);
-
-                if (config.postfork) {
-                    config.postfork(i);
-                }
-
-                int status = accept();
-                idebug("Server worker-%u exiting {status=%d}", i, status);
-                return status;
-            }
-
-            // Wait for all workers to exit
-            int ret = EXIT_SUCCESS;
-            while (true) {
-                int status = EXIT_SUCCESS;
-                auto pid = wait(&status);
-                if (pid <= 0) {
-                    idebug("What the hell happened? %d", pid);
-                    break;
-                }
-                ret = status == EXIT_SUCCESS? ret : status;
-                idebug("Server worker exited {pid=%d, status=%d}", pid, status);
-            }
-
-            return ret;
+            });
         }
 
         void stop()

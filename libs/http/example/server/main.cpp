@@ -2,7 +2,9 @@
 // Created by Mpho Mbotho on 2020-12-18.
 //
 
+#include <suil/base/ipc.hpp>
 #include <suil/http/common.hpp>
+
 #include "suil/http/server/endpoint.hpp"
 #include "suil/http/server/sysattrs.hpp"
 #include "suil/http/server/cors.hpp"
@@ -15,7 +17,10 @@
 
 namespace hs = suil::http::server;
 namespace net  = suil::net;
+namespace ipc  = suil::ipc;
+
 using suil::http::Jwt;
+
 
 struct User {
     suil::String passwd{};
@@ -29,6 +34,8 @@ const suil::UnorderedMap<User> users = {
 
 int main(int argc, char *argv[])
 {
+    ipc::init(opt(nworkers, 2));
+
     using Server = hs::Endpoint<
                         hs::Initializer,        // Block all routes until application is initialized
                         hs::SystemAttrs,        // System level attributes
@@ -48,17 +55,20 @@ int main(int argc, char *argv[])
     Server ep("/api", opt(serverConfig, std::move(sock)) ,opt(keepAliveTime, 5_min));
 
     // Add endpoint administration routes
-    hs::EndpointAdmin::setup(ep);
+    hs::Admin(ep);
+
+    // Enable ping route
+    hs::Ping(ep);
 
     // Configure hs::Initializer middleware
-    ep.middleware<hs::Initializer>().setup(ep)
-        ([&ep](const hs::Request& req, hs::Response& resp) {
-            resp << "Server initialized by: " << req.query().get("admin");
-            ep.context<hs::Initializer>(req).unblock();
-        });
+    hs::Initialize(ep)
+    ([&ep](const hs::Request& req, hs::Response& resp) {
+        resp << "Server initialized by: " << req.query().get("admin");
+        ep.context<hs::Initializer>(req).unblock();
+    });
 
     // Configure hs::JwtAuthorization middleware
-    ep.middleware<hs::JwtAuthorization>().setup(opt(key, "dzHzHvr"));
+    ep.middleware<hs::JwtAuthorization>().setup(opt(key, "dzHzHvr"), opt(expires, 600));
 
     // Configure hs::RedisMiddelware
     ep.middleware<hs::RedisMiddleware>().setup("redis", 6379);
@@ -141,5 +151,5 @@ int main(int argc, char *argv[])
         conn.hset(jwtAuth.jwt().aud(), key, id);
     });
 
-    return ep.start();
+    return ep.start(/*opt(nprocs, 0)*/);
 }
