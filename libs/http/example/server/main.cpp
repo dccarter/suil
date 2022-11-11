@@ -35,7 +35,7 @@ const suil::UnorderedMap<User> users = {
 int main(int argc, char *argv[])
 {
     suil::setup(opt(verbose, 0));
-    ipc::init(opt(nworkers, 2));
+    ipc::init(/*opt(nworkers, 2)*/);
 
     using Server = hs::Endpoint<
                         hs::Initializer,        // Block all routes until application is initialized
@@ -61,18 +61,28 @@ int main(int argc, char *argv[])
     // Enable ping route
     hs::Ping(ep);
 
+    // Configure hs::RedisMiddelware
+    ep.middleware<hs::RedisMiddleware>().setup("redis", 6379);
+
+
     // Configure hs::Initializer middleware
-    hs::Initialize(ep)
-    ([&ep](const hs::Request& req, hs::Response& resp) {
-        resp << "Server initialized by: " << req.query().get("admin");
-        ep.context<hs::Initializer>(req).unblock();
-    });
+    {
+        scoped(conn, ep.middleware<hs::RedisMiddleware>().conn());
+        auto initialized = conn.get<bool>("initialized", false);
+
+        hs::Initialize(ep, initialized)
+        ([&ep](const hs::Request& req, hs::Response& resp) {
+            auto admin = req.query().get("admin");
+            resp << "Server initialized by: " << admin;
+            ep.context<hs::Initializer>(req).unblock();
+            scoped(conn, ep.context<hs::RedisMiddleware>(req).conn());
+            // application is initialzed
+            conn.set("initiazed", true);
+        });
+    }
 
     // Configure hs::JwtAuthorization middleware
     ep.middleware<hs::JwtAuthorization>().setup(opt(key, "dzHzHvr"), opt(expires, 600));
-
-    // Configure hs::RedisMiddelware
-    ep.middleware<hs::RedisMiddleware>().setup("redis", 6379);
 
     // attach a file server to the endpoint
     hs::FileServer fileServer(ep);

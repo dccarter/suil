@@ -73,7 +73,7 @@ namespace suil {
     static  MessageHandler ipcHandlers[256] = {nullptr};
 
     static std::vector<CleanUpHandler> cleanupHandlers{};
-    using InflightGetData = std::vector<Data>;
+    using InflightGetData = std::vector<IPCGetPayload *>;
     static std::unordered_map<chan, InflightGetData> inflightGets{};
 
     static inline bool hasMessageHandler(uint8_t w, uint8_t m) {
@@ -671,7 +671,7 @@ namespace suil {
             size_t tread = 0;
 
             if (hdr.len) {
-                if (hdr.len < 255) {
+                if (hdr.id != GET_RESPONSE && hdr.len < 255) {
                     // no need to allocate memory for this
                     uint8 RX_BUF[256];
                     data = RX_BUF;
@@ -721,8 +721,7 @@ namespace suil {
 
             // handle ipc message
             MessageHandler h = ipcHandlers[hdr.id];
-            ltrace(WLOG, "invoking handler with [handler:%p|data:%p|len:%lu|allocd:%d",
-                         h, data, tread, allocd);
+            ltrace(WLOG, "invoking handler with [data:%p|len:%lu|allocd:%d", data, tread, allocd);
             go(invokeHandler(h, hdr.src, data, tread, allocd));
 
             return 0;
@@ -803,7 +802,7 @@ namespace suil {
             cleanupHandlers.insert(cleanupHandlers.begin(), std::move(handler));
         }
 
-        Data get(uint8 msg, uint8 w, int64 tout) {
+        GetReponseData get(uint8 msg, uint8 w, int64 tout) {
             if (w == SPID_PARENT || w == spid) {
                 lerror(WLOG, "executing get to (%hhu) parent or current worker not supported",
                        w);
@@ -832,8 +831,9 @@ namespace suil {
 
             if (status && !data.empty()) {
                 /* successfully received data from worker */
-                ltrace(WLOG, "got Response: data %p, size %lu", data.data(), data.size());
-                return std::move(data[0]);
+                auto resp = data[0];
+                ltrace(WLOG, "got Response: data %p, size %lu", resp->data, resp->size);
+                return { resp->data, resp->size };
             } else {
                 lerror(WLOG, "get from worker %hhu failed, msg %hhu", w, msg);
             }
@@ -841,7 +841,8 @@ namespace suil {
             return {};
         }
 
-        std::vector<Data> gather(uint8_t msg, int64_t tout) {
+        std::vector<GetReponseData> gather(uint8_t msg, int64_t tout) {
+            auto start = mnow();
             if (IPC->nworkers == 0) {
                 lwarn(WLOG, "executing get %hhu not supported when no workers", msg);
                 return {};
@@ -877,11 +878,11 @@ namespace suil {
                 }
 
                 /* return gathered results */
-                auto ret = std::move(data);
-                for (auto& d: ret) {
-                    auto s = hexstr(d.data(), d.size());
-                    strace("data: " PRIs, _PRIs(s));
+                std::vector<GetReponseData> ret{};
+                for (auto& d: data) {
+                    ret.push_back({d->data, d->size});
                 }
+                ldebug(WLOG, "took %lu ms to gather", mnow() - start);
                 return std::move(ret);
             } else {
                 lwarn(WLOG, "acquiring SHM_GET_LOCK timed out");
@@ -930,10 +931,18 @@ namespace suil {
             ipc::registerHandler(msg,
                            [handler](uint8_t src, uint8* data, size_t /*unused*/, bool /*unused*/) {
                                /* invoke the handler with the buffer as the token */
-                               ltrace(WLOG, "invoking get handler [handler:%p|token:%p]", handler, data);
+                               ltrace(WLOG, "invoking get handler [token:%p]", data);
                                handler(data, src);
                                return false;
                            });
+        }
+
+        void GetReponseData::release()
+        {
+            if (data) {
+                delete[] ((uint8 *)data - sizeof(IPCGetPayload));
+                data = nullptr;
+            }
         }
 
         void registerGetResponse() {
@@ -949,13 +958,7 @@ namespace suil {
                                 chan handle = payload->handle;
                                 auto it = inflightGets.find(handle);
                                 if (it != inflightGets.end()) {
-                                    auto s = hexstr(data, len);
-                                    strace("data: " PRIs, _PRIs(s));
-                                    auto s2 = hexstr(&data[sizeof(IPCGetPayload)-1], len-sizeof(IPCGetPayload));
-                                    strace("data2: " PRIs, _PRIs(s2));
-                                    it->second.push_back(
-                                            Data{data, len-sizeof(IPCGetPayload), allocd}
-                                            .own(sizeof(IPCGetPayload)-1));
+                                    it->second.push_back(payload);
                                     chs(handle, uint8, src);
                                     return true;
                                 }

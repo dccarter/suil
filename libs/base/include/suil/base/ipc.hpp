@@ -138,6 +138,12 @@ namespace suil {
 
     namespace ipc {
 
+        struct GetReponseData {
+            void *data{nullptr};
+            size_t size{0};
+            void release();
+        };
+
         void initialize(int n);
 
         template <typename ...Opts>
@@ -204,13 +210,21 @@ namespace suil {
 
         void spinUnlock(const uint8 idx);
 
-        Data get(uint8 msg, uint8 w, int64 tout = -1);
+        GetReponseData get(uint8 msg, uint8 w, int64 tout = -1);
 
-        std::vector<Data> gather(uint8 msg, int64 tout = -1);
+        std::vector<GetReponseData> gather(uint8 msg, int64 tout = -1);
 
         void sendGetResponse(const void *token, uint8 to, const void *data, size_t len);
 
         void registerGetHandler(uint8 msg, IPCGetHandler handler);
+
+        inline void release(GetReponseData data) { data.release(); }
+
+        inline void release(std::vector<GetReponseData>& data) {
+            for( auto d: data)
+                d.release();
+            data.clear();
+        }
     };
 
     enum {

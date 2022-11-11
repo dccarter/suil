@@ -103,7 +103,8 @@ namespace suil::http::server {
                     // strace("received stats [data:%p|size:%lu]", proc.data(), proc.size());
                     // HeapBoard hb(proc.data(), proc.size());
                     stats.emplace_back();
-                    memcpy(&stats.back(), proc.data(), sizeof(HttpServerStats));
+                    memcpy(&stats.back(), proc.data, sizeof(HttpServerStats));
+                    ipc::release(all);
                 }
                 return stats;
             });

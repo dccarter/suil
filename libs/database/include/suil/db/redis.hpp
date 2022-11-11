@@ -238,6 +238,15 @@ namespace suil::db {
         }
 
         template <typename T>
+        auto get(const String& key, T&& def) -> T {
+            auto resp = send("GET", key);
+            if (!resp) {
+                return std::move(def);
+            }
+            return static_cast<T>(resp);
+        }
+
+        template <typename T>
         bool set(const String& key, const T& val) {
             return send("SET", key, val).status();
         }

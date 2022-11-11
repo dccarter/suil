@@ -14,7 +14,16 @@ POST http://{{host}}/api/app-init?admin=Admin
 GET http://{{host}}/api/login?username={{username}}&passwd={{password}}
 
 ###
-GET http://{{host}}/api/_admin/routes
+# @name refresh
+GET http://{{host}}/api/login?username={{username}}&passwd={{password}}
+Authorization: Bearer {{login.response.body.$.refreshToken}}
+
+###
+GET http://{{host}}/api/revoke
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+GET http://{{host}}/api/_admin/route/6
 Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ###

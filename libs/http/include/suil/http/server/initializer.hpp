@@ -31,21 +31,21 @@ namespace suil::http::server {
         void after(Request& req,  Response& resp, Context& ctx);
 
         template <typename Ep>
-        DynamicRule& setup(Ep& ep)
+        DynamicRule& setup(Ep& ep, bool blocked = false)
         {
             auto& route = ep("/app-init");
             route("POST"_method, "OPTIONS"_method)
             .attrs(opt(Authorize, false));
 
             _initRoute = route.id();
-            _blocked = true;
+            _blocked = blocked;
 
             return route;
         }
 
     private:
         template <typename ...Mws>
-        friend auto& Initialize(Endpoint<Mws...>& ep);
+        friend auto& Initialize(Endpoint<Mws...>& ep, bool);
         void enable(Router& router);
 
         std::atomic_bool     _blocked{false};
@@ -53,15 +53,15 @@ namespace suil::http::server {
     };
 
     template <typename ...Mws>
-    auto& Initialize(Endpoint<Mws...>& ep)
+    auto& Initialize(Endpoint<Mws...>& ep, bool blocked)
     {
         auto& initializer = ep.template middleware<Initializer>();
         ipc::registerHandler(INITIALIZER_ENABLE, 
-        [&](uint8 /*unsued*/, uint8 * /*unused*/, size_t /*unused*/, bool /* unused */) {
+        [&](uint8 /*unsued*/, uint8 * /*unused*/, size_t /*unused*/, bool /*unused*/) {
             initializer.enable(ep.router());
             return false;
         });
-        return initializer.setup(ep);
+        return initializer.setup(ep, blocked);
     }
 }
 #endif //SUIL_HTTP_SERVER_INITIALIZER_HPP
