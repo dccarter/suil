@@ -32,9 +32,9 @@ set(SUIL_BUILD_TAG     devel CACHE STRING "Version tag string")
 set(SUIL_SOFTWARE_NAME suil  CACHE STRING "The name of the server")
 set(SUIL_DEBUG_TAG     1a30f8248a6b11e781846f6e6c696e65 CACHE STRING "The tag used by the debug application tag")
 set(SUIL_BASE_DIR      ".suil" CACHE STRING "The base directory of suil application")
-set(SUIL_COPYRIGHT     "Copyright (C) 2020, 2017-2020 Suilteam")
+set(SUIL_COPYRIGHT     "Copyright (C) 2022, 2017-2022 Suilteam")
 
-# Some times implementations are unsafe, for example suil::String is VERY unsafe and need to
+# Some implementations are unsafe, for example suil::String is VERY unsafe and need to
 # be used with caution.
 # Alternative implementations are
 # LAZY multiple type instances can share a buffer so the instances must be used with caution

@@ -3,6 +3,7 @@
 //
 
 #include <suil/base/env.hpp>
+#include <suil/base/ipc.hpp>
 #include <suil/http/server/pgsqlmw.hpp>
 #include <suil/http/server/endpoint.hpp>
 #include <suil/http/server/sysattrs.hpp>
@@ -50,6 +51,8 @@ void seedDatabase(PgSqlConnection& conn)
 int main(int argc, char *argv[])
 {
     suil::setup(opt(verbose, 1));
+    suil::ipc::init();
+
     auto config = ServerConfig{
         .socketConfig = TcpSocketConfig {
             .bindAddr = {.name = "0.0.0.0", .port = 8080}
@@ -154,5 +157,5 @@ int main(int argc, char *argv[])
         resp.end();
     });
 
-    return ep.start(opt(nprocs, 0));
+    return ep.start();
 }

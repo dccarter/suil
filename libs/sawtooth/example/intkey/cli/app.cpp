@@ -7,24 +7,22 @@
 
 namespace suil::saw {
 
-    App::App(args::Command& cmd)
+    App::App(suil::Command& cmd)
         : Client::RestApi(
-                cmd.value("url", "http://rest-api"_str),
+                cmd.get<const char*>("url"),
                 "int-key",
                 "1.0",
-                cmd.value("key", "2c5683d43573214fa939d2df4ac0767fe3500b6eacbafa11cf8b8aeca8db9d60"_str),
-                cmd.value<int32_t>("port", 8008)
+                cmd.get<const char*>("key"),
+                cmd.get<int32>("port")
                 ),
            mCmd{cmd}
     {}
 
     void App::modify(const String& verb)
     {
-        auto name = mCmd.at<String>(0,
-                                    "Missing key name - usage: intkey-cli set|dec|inc [...] name value");
-        auto value = mCmd.at<int32>(1,
-                                    "Missing key value - usage: intkey-cli set|dec|inc [...] name value");
-        auto wait  = Ego.mCmd.value<uint64>("wait", 0) * 1000;
+        auto name = mCmd.at<const char*>(0);
+        auto value = mCmd.at<int32>(1);
+        auto wait  = Ego.mCmd.get<uint64>("wait") * 1000;
 
         json::Object obj(json::Obj,
                  "Verb", verb,
@@ -40,7 +38,7 @@ namespace suil::saw {
 
     void App::get()
     {
-        auto name = mCmd.at<String>(0, "Missing key name - usage: intkey-cli get [...] endpoint name");
+        auto name = mCmd.at<const char*>(0);
         auto ret = Ego.getState(name);
         if (!ret) {
             serror("failed to retrieve key state - %s", ret.exception().what());
@@ -50,8 +48,8 @@ namespace suil::saw {
         auto state = std::move(ret.value());
         if (!state.empty()) {
             auto obj = json::Object::decode(state);
-            auto value = (int32_t) obj(name());
-            sinfo(PRIs " = %d", _PRIs(name), value);
+            auto value = (int32_t) obj(name);
+            sinfo("%s = %d", name, value);
         }
     }
 
@@ -75,8 +73,8 @@ namespace suil::saw {
 
     void App::batch()
     {
-        auto count = Ego.mCmd.value<uint32>("count", 10);
-        auto wait  = Ego.mCmd.value<uint64>("wait", 0) * 1000;
+        auto count = Ego.mCmd.get<uint32>("count");
+        auto wait  = Ego.mCmd.get<uint64>("wait") * 1000;
         auto& Enc = Ego.encoder();
         auto prefix = Ego.getPrefix();
         std::vector<Client::Transaction> txns;
@@ -111,37 +109,37 @@ namespace suil::saw {
         }
     }
 
-    void App::cmdSet(args::Command& cmd)
+    void App::cmdSet(suil::Command& cmd)
     {
         App app(cmd);
         app.modify("set");
     }
 
-    void App::cmdGet(args::Command& cmd)
+    void App::cmdGet(suil::Command& cmd)
     {
         App app(cmd);
         app.get();
     }
 
-    void App::cmdBatch(args::Command& cmd)
+    void App::cmdBatch(suil::Command& cmd)
     {
         App app(cmd);
         app.batch();
     }
 
-    void App::cmdDecrement(args::Command& cmd)
+    void App::cmdDecrement(suil::Command& cmd)
     {
         App app(cmd);
         app.modify("dec");
     }
 
-    void App::cmdIncrement(args::Command& cmd)
+    void App::cmdIncrement(suil::Command& cmd)
     {
         App app(cmd);
         app.modify("inc");
     }
 
-    void App::cmdList(args::Command& cmd)
+    void App::cmdList(suil::Command& cmd)
     {
         App app(cmd);
         app.list();

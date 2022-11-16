@@ -39,20 +39,6 @@ namespace suil {
               m_own(own)
     {}
 
-    Data::Data(const void *data, size_t size, uint32 offset, bool own)
-        : m_cdata((uint8_t*) data),
-          m_size((uint32_t)(size)),
-          m_own(false),
-          m_offset{own}
-    {}
-
-    Data::Data(void *data, size_t size, uint32 offset, bool own)
-        : m_data((uint8_t*) data),
-          m_size((uint32_t)(size)),
-          m_own(true),
-          m_offset{own}
-    {}
-
     Data::Data(const Data& d) noexcept
             : Data()
     {
@@ -77,23 +63,20 @@ namespace suil {
     }
 
     Data::Data(Data&& d) noexcept
-        : Data(d.m_data, d.m_size, d.m_offset, d.m_own)
+        : Data(d.m_data, d.m_size, d.m_own)
     {
         d.m_data = nullptr;
         d.m_size = 0;
         d.m_own  = false;
-        d.m_offset = 0;
     }
 
     Data& Data::operator=(Data&& d) noexcept {
         Ego.clear();
         Ego.m_data = d.m_data;
         Ego.m_size = d.m_size;
-        Ego.m_offset = d.m_offset;
         Ego.m_own  = d.m_own;
         d.m_data = nullptr;
         d.m_size = 0;
-        d.m_offset = 0;
         d.m_own  = false;
         return Ego;
     }
@@ -101,16 +84,10 @@ namespace suil {
     Data Data::copy() const {
         Data tmp{Ego.m_size};
         if (Ego.m_size) {
-            memcpy(tmp.m_data, Ego.data(), Ego.m_size);
+            memcpy(tmp.data(), Ego.data(), Ego.m_size);
             tmp.m_own  = true;
         }
         return std::move(tmp);
-    }
-
-    Data Data::own(uint32 offset) {
-        Ego.m_offset = offset;
-        if (Ego.m_own) return std::move(Ego);
-        return Ego.copy();
     }
 
     void Data::clear() {
@@ -119,7 +96,6 @@ namespace suil {
         }
         Ego.m_data = nullptr;
         Ego.m_size = 0;
-        Ego.m_offset = 0;
         Ego.m_own  = false;
     }
 
@@ -129,13 +105,13 @@ namespace suil {
             auto outSize{(size / 2) + 3};
             auto out = new uint8_t[outSize];
             bytes(String{(const char *) data, size, false}, out, outSize);
-            return Data{out, size / 2, true};
+            return {out, size / 2, true};
         }
         else {
             Buffer ob;
             Base64::decode(ob, data, size);
             size = ob.size();
-            return Data{ob.release(), size, true};
+            return {ob.release(), size, true};
         }
     }
 
@@ -152,7 +128,7 @@ namespace suil {
             throw AccessViolation("requested resize is greater than the buffer size");
         }
         resize = (resize == 0)? m_size : resize;
-        auto tmp = Data{m_data, resize, m_offset, m_own};
+        auto tmp = Data{m_data, resize, m_own};
         m_data = nullptr;
         m_own = false;
         m_size = false;

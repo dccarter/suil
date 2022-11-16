@@ -50,26 +50,6 @@ namespace suil {
          */
         Data(const void *data, size_t size, bool own = true);
 
-        /**
-         * Creates a new Data instance which uses the given data.
-         *
-         * @param data the buffer to be used by the instance
-         * @param size the size of the buffer
-         * @param own true is the instance assumes ownership of the data, meaning
-         * it is responsible for deallocating the memory
-         */
-        Data(const void *data, size_t size, uint32 offset, bool own);
-
-        /**
-         * Creates a new Data instance which uses the given data.
-         *
-         * @param data the buffer to be used by the instance
-         * @param size the size of the buffer
-         * @param own true is the instance assumes ownership of the data, meaning
-         * it is responsible for deallocating the memory
-         */
-        Data(void *data, size_t size, uint32 offset, bool own);
-
         Data(const Data& d) noexcept;
         Data& operator=(const Data& d) noexcept;
 
@@ -84,8 +64,7 @@ namespace suil {
          * @return a reference to this data
          */
         inline Data peek() const {
-            Data d{&Ego.m_data[Ego.m_offset], Ego.m_size, false};
-            return std::move(d);
+            return {Ego.m_data, Ego.m_size, false};
         }
 
         /**
@@ -106,21 +85,21 @@ namespace suil {
          * @return a raw pointer to the underlying data instance
          */
         inline uint8_t* data() {
-            return &Ego.m_data[Ego.m_offset];
+            return Ego.m_data;
         }
 
         /**
          * @return a raw const pointer to the underlying data instance
          */
         inline const uint8_t* data() const {
-            return &Ego.m_data[Ego.m_offset];
+            return Ego.m_data;
         }
 
         /**
          * @return a raw pointer to the underlying data instance
          */
         inline const uint8_t* cdata() const {
-            return &Ego.m_cdata[Ego.m_offset];
+            return Ego.m_cdata;
         }
 
         /**
@@ -161,8 +140,6 @@ namespace suil {
          */
         Data copy() const;
 
-        Data own(uint32 offset = 0);
-
         /**
          * Releases ownership of the underlying buffer
          * @return
@@ -192,7 +169,6 @@ namespace suil {
         };
         bool     m_own{false};
         uint32_t m_size{0};
-        uint32 m_offset{0};
     } __attribute__((aligned(1)));
 
     /**

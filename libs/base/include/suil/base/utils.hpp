@@ -133,6 +133,15 @@ using uint16 = uint16_t;
 using uint32 = uint32_t;
 using uint64 = uint64_t;
 
+__attribute__((noreturn))
+__attribute__((format(printf, 1, 2)))
+void suilAbort(const char *fmt, ...);
+
+#define suilAssert(COND, FMT, ...) \
+    if (!(COND)) suilAbort("%s:%d : (" #COND ") " FMT "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+
+#define suilAssert0(cond) suilAssert((cond), "")
+
 namespace suil {
 
     /**

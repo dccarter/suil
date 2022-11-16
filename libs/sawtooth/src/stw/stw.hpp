@@ -16,8 +16,8 @@ namespace suil::saw::Stw {
 
     void initLogging();
 
-    void cmdCreate(args::Command& cmd);
-    void cmdGenerate(args::Command& cmd);
-    void cmdGet(args::Command& cmd);
-    void cmdList(args::Command& cmd);
+    void cmdCreate(suil::Command& cmd);
+    void cmdGenerate(suil::Command& cmd);
+    void cmdGet(suil::Command& cmd);
+    void cmdList(suil::Command& cmd);
 }
