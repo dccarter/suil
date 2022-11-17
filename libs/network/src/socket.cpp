@@ -9,7 +9,7 @@ namespace suil::net {
 
 Socket::~Socket() noexcept
 {
-    itrace("destroying socket %s", Ego.id());
+    itrace("destroying socket %s", mId());
 }
 
 const char * Socket::ipstr(ipaddr addr, char *buf)

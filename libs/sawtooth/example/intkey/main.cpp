@@ -11,46 +11,40 @@
 
 using suil::Exception;
 using suil::String;
-using suil::args::Arguments;
-using suil::args::Command;
-using suil::args::Parser;
 using suil::saw::TransactionProcessor;
 using suil::saw::IntKeyHandler;
 
-static void start(Command& cmd);
-
-int main(int argc, char* argv[])
-{
-    Parser parser("int-key", "1.0", "Integer key sawtooth transaction processor");
-    try {
-        parser(
-            Command("start", "Start running integer key transaction processor")
-                ({"endpoint", "The address of the validator to connect to", 'C', false})
-                (start)
-                ()
-        );
-        parser.parse(argc, argv);
-        parser.handle();
-    }
-    catch (...) {
-        auto ex = Exception::fromCurrent();
-        serror("unhandled error: %s", ex.what());
-        return EXIT_FAILURE;
-    }
-}
-
-void start(Command& cmd)
+AddCommand(start, "Start running integer key transaction processor",
+    Positionals(),
+    Str(Name("endpoint"),
+        Sf('C'),
+        Help("The address of the validator to connect to"),
+        Def(VALIDATOR_ENDPOINT))
+)
 {
     constexpr const char * INTKEY_NAMESPACE = "int-key";
-    auto config = cmd.value("endpoint", String{VALIDATOR_ENDPOINT}).dup();
+    auto config = cmd.get<const char*>("endpoint");
     try {
-        TransactionProcessor processor(std::move(config));
+        TransactionProcessor processor(String{config}.dup());
         auto& handler = processor.registerHandler<IntKeyHandler>(INTKEY_NAMESPACE, INTKEY_NAMESPACE);
         handler.getVersions().emplace_back("1.0");
         processor.run();
+
+        return EXIT_SUCCESS;
     }
     catch (...) {
         auto ex = Exception::fromCurrent();
         serror("%s", ex.what());
+
+        return EXIT_FAILURE;
     }
+}
+
+int main(int argc, char* argv[])
+{
+    SuilParser("int-key", "1.0",
+        Commands(AddCmd(start)),
+        DefaultCmd(start));
+    
+    return suil::cmdExecute(parser, argc, argv);
 }

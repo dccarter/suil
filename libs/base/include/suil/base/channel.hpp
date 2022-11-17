@@ -123,7 +123,7 @@ namespace suil {
         Channel &operator<<(const R res) {
             ;
             if (ch != nullptr)
-                chs(ch, R, res);
+                chs(ch, R, std::move(res));
             return *this;
         }
 
@@ -189,7 +189,7 @@ namespace suil {
                     return false;
                 }
 
-                f(true, res);
+                f(true, std::move(res));
                 rxd--;
             }
 
@@ -254,6 +254,14 @@ namespace suil {
             return *this;
         }
 
+        const chan handle() const {
+            return ch;
+        }
+
+        chan handle() {
+            return ch;
+        }
+
         /**
          * the destructor will close and destroy the underlying channel
          */
@@ -283,7 +291,7 @@ namespace suil {
             } else {
                 choose{
                         chin(ch, R, tmp) :
-                        res = tmp;
+                        res = std::move(tmp);
                         deadline(dd):
                         rc  = false;
                         chend

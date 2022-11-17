@@ -127,6 +127,7 @@ namespace suil::http::server {
         }
 
         inline HttpServerStats& stats() {
+            Ego._ctx->_stats.pid = spid;
             return Ego._ctx->_stats;
         }
 

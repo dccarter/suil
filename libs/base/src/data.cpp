@@ -45,7 +45,7 @@ namespace suil {
         if (d.m_size) {
             Ego.m_data = new uint8_t[d.m_size];
             Ego.m_size = d.m_size;
-            memcpy(Ego.m_data, d.m_data, d.m_size);
+            memcpy(Ego.m_data, d.data(), d.m_size);
             Ego.m_own  = true;
         }
     }
@@ -55,7 +55,7 @@ namespace suil {
         if (d.m_size) {
             Ego.m_data = new uint8_t[d.m_size];
             Ego.m_size = d.m_size;
-            memcpy(Ego.m_data, d.m_data, d.m_size);
+            memcpy(Ego.m_data, d.data(), d.m_size);
             Ego.m_own  = true;
         }
 
@@ -67,7 +67,7 @@ namespace suil {
     {
         d.m_data = nullptr;
         d.m_size = 0;
-        d.m_own  = 0;
+        d.m_own  = false;
     }
 
     Data& Data::operator=(Data&& d) noexcept {
@@ -82,11 +82,9 @@ namespace suil {
     }
 
     Data Data::copy() const {
-        Data tmp{};
+        Data tmp{Ego.m_size};
         if (Ego.m_size) {
-            tmp.m_data = new uint8_t[Ego.m_size];
-            tmp.m_size = Ego.m_size;
-            memcpy(tmp.m_data, Ego.m_data, Ego.m_size);
+            memcpy(tmp.data(), Ego.data(), Ego.m_size);
             tmp.m_own  = true;
         }
         return std::move(tmp);
@@ -98,7 +96,7 @@ namespace suil {
         }
         Ego.m_data = nullptr;
         Ego.m_size = 0;
-        Ego.m_own  = 0;
+        Ego.m_own  = false;
     }
 
     Data bytes(const uint8_t *data, size_t size, bool b64)
@@ -107,13 +105,13 @@ namespace suil {
             auto outSize{(size / 2) + 3};
             auto out = new uint8_t[outSize];
             bytes(String{(const char *) data, size, false}, out, outSize);
-            return Data{out, size / 2, true};
+            return {out, size / 2, true};
         }
         else {
             Buffer ob;
             Base64::decode(ob, data, size);
             size = ob.size();
-            return Data{ob.release(), size, true};
+            return {ob.release(), size, true};
         }
     }
 

@@ -21,6 +21,8 @@
 		"wesbos.theme-cobalt2",
 		"ms-azuretools.vscode-docker",
 		"akamud.vscode-theme-onedark",
-		"pkief.material-icon-theme"
+		"pkief.material-icon-theme",
+		"jeff-hykin.better-cpp-syntax",
+		"cweijan.vscode-database-client2"
 	]
 }

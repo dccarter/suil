@@ -2,6 +2,7 @@
 // Created by Mpho Mbotho on 2021-06-11.
 //
 
+#define SUIL_CMD_PREFIX_NAME
 #include "stw.hpp"
 
 namespace suil::saw::Stw {
@@ -48,46 +49,46 @@ namespace suil::saw::Stw {
             }));
     }
 
-    void cmdCreate(args::Command& cmd)
+    void cmdCreate(suil::Command& cmd)
     {
-        String path = cmd.value("path", ".sawtooth.key"_str);
-        String passwd = cmd["passwd"];
+        auto path = cmd.get<const char*>("path");
+        auto passwd = cmd.get<const char*>("passwd");
 
         auto wall = Client::Wallet::create(path, passwd);
         wall.save();
     }
 
-    void cmdGenerate(args::Command& cmd)
+    void cmdGenerate(suil::Command& cmd)
     {
-        String path = cmd.value("path", ".sawtooth.key"_str);
-        String passwd = cmd["passwd"];
-        String name = cmd["name"];
+        auto path = cmd.get<const char*>("path");
+        auto passwd = cmd.get<const char*>("passwd");
+        auto name = cmd.get<const char*>("name");
 
         auto wall = Client::Wallet::open(path, passwd);
         wall.generate(name);
         wall.save();
     }
 
-    void cmdGet(args::Command& cmd)
+    void cmdGet(suil::Command& cmd)
     {
-        String path = cmd.value("path", ".sawtooth.key"_str);
-        String passwd = cmd["passwd"];
-        String name = cmd.value("name", ""_str);
+        auto path = cmd.get<const char*>("path");
+        auto passwd = cmd.get<const char*>("passwd");
+        auto name =cmd.get<const char*>("name");
 
         auto wall = Client::Wallet::open(path, passwd);
         const auto& key = wall.get(name);
         if (key.empty()) {
-            serror("Key " PRIs " does not exist", _PRIs(name));
+            serror("Key %s does not exist", name);
         }
         else {
             sinfo(PRIs, _PRIs(key));
         }
     }
 
-    void cmdList(args::Command& cmd)
+    void cmdList(suil::Command& cmd)
     {
-        String path = cmd.value("path", ".sawtooth.key"_str);
-        String passwd = cmd["passwd"];
+        auto path = cmd.get<const char*>("path");
+        auto passwd = cmd.get<const char*>("passwd");
         auto wall = Client::Wallet::open(path, passwd);
         const auto& schema = wall.schema();
         for (const auto& key: schema.Keys) {

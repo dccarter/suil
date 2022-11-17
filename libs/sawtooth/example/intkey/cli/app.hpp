@@ -15,14 +15,14 @@ namespace suil::saw {
         DISABLE_COPY(App);
         DISABLE_MOVE(App);
 
-        App(args::Command& cmd);
+        App(suil::Command& cmd);
 
-        static void cmdSet(args::Command& cmd);
-        static void cmdGet(args::Command& cmd);
-        static void cmdIncrement(args::Command& cmd);
-        static void cmdDecrement(args::Command& cmd);
-        static void cmdList(args::Command& cmd);
-        static void cmdBatch(args::Command& cmd);
+        static void cmdSet(suil::Command& cmd);
+        static void cmdGet(suil::Command& cmd);
+        static void cmdIncrement(suil::Command& cmd);
+        static void cmdDecrement(suil::Command& cmd);
+        static void cmdList(suil::Command& cmd);
+        static void cmdBatch(suil::Command& cmd);
 
     private:
         void postSubmit(const Return<String>& ret, uint64 wait);
@@ -31,6 +31,6 @@ namespace suil::saw {
         void batch();
         void list();
 
-        args::Command& mCmd;
+        suil::Command& mCmd;
     };
 }

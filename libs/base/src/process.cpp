@@ -229,7 +229,7 @@ namespace suil {
             if (ev & FDW_IN) {
                 // notification received
                 int sig{0};
-                if (::read(Ego.notifChan[1], &sig, sizeof(sig)) == sizeof(sig)) {
+                if (::read(Ego.notifChan[0], &sig, sizeof(sig)) == sizeof(sig)) {
                     if (sig != SIGCHLD) {
                         // shouldn't have received this signal
                         iwarn("received signal=%d instead of SIGCHLD", sig);

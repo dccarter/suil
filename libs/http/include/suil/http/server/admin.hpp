@@ -8,6 +8,7 @@
 #include "suil/http/server/response.hpp"
 #include "suil/http/server/request.hpp"
 
+#include <suil/base/ipc.hpp>
 #include <suil/base/sio.hpp>
 #include <suil/base/string.hpp>
 
@@ -21,6 +22,16 @@ namespace suil::http::server {
 
         template <typename  E>
         static void setup(E& ep, const String& auth = "System-Admin") {
+
+            ipc::registerGetHandler(GET_STATS, [&](void *token, int src) {
+                auto& stats = ep.stats();
+                // suil::StackBoard<128> sb{};
+                // sb << stats;
+                // auto s = hexstr(sb.rd(), sb.size());
+                // strace("data: " PRIs, _PRIs(s));
+                ipc::sendGetResponse(token, src, &stats, sizeof(stats));
+            });
+
             ldebug(&ep, "initializing administration endpoint");
             // Use dynamic routes
             ep("/_admin/routes")
@@ -83,7 +94,19 @@ namespace suil::http::server {
             ("GET"_method, "OPTIONS"_method)
             .attrs(opt(Authorize, Auth{auth.dup()}))
             ([&ep]{
-                return ep.stats();
+                std::vector<HttpServerStats> stats{};
+                stats.push_back(ep.stats());
+                auto all = ipc::gather(GET_STATS);
+                for (auto& proc: all) {
+                    // auto s = hexstr(proc.data(), proc.size());
+                    // strace("data: " PRIs, _PRIs(s));
+                    // strace("received stats [data:%p|size:%lu]", proc.data(), proc.size());
+                    // HeapBoard hb(proc.data(), proc.size());
+                    stats.emplace_back();
+                    memcpy(&stats.back(), proc.data, sizeof(HttpServerStats));
+                    ipc::release(all);
+                }
+                return stats;
             });
         }
 
@@ -108,5 +131,21 @@ namespace suil::http::server {
             return status;
         }
     };
+
+    template <typename ...Mws>
+    void Admin(Endpoint<Mws...>& ep)
+    {
+        EndpointAdmin::setup(ep);
+    }
+
+    template <typename ...Mws>
+    void Ping(Endpoint<Mws...>& ep, const char* route = "/ping")
+    {
+        ep(route)
+        ("GET"_method)
+        ([]{
+            return Status::Ok;
+        });
+    }
 }
 #endif //SUIL_HTTP_SERVER_ADMIN_HPP

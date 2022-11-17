@@ -64,8 +64,7 @@ namespace suil {
          * @return a reference to this data
          */
         inline Data peek() const {
-            Data d{Ego.m_data, Ego.m_size, false};
-            return std::move(d);
+            return {Ego.m_data, Ego.m_size, false};
         }
 
         /**
@@ -112,7 +111,7 @@ namespace suil {
         inline bool operator==(const Data& other) const {
             if (Ego.m_size != other.m_size)
                    return false;
-            return (Ego.m_size == 0) || memcmp(Ego.m_data, other.m_data, Ego.m_size) == 0;
+            return (Ego.m_size == 0) || memcmp(Ego.data(), other.data(), Ego.m_size) == 0;
         }
 
         /**
@@ -125,7 +124,7 @@ namespace suil {
         inline bool operator!=(const Data& other) {
             if (Ego.m_size != other.m_size)
                    return true;
-            return (Ego.m_size != 0) && memcmp(Ego.m_data, other.m_data, Ego.m_size) != 0;
+            return (Ego.m_size != 0) && memcmp(Ego.data(), other.data(), Ego.m_size) != 0;
         }
 
         /**
