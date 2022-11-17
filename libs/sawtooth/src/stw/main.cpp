@@ -22,7 +22,7 @@ AddCommand(create, "Create a new wallet file initialized with a master key",
 
 AddCommand(gen, "Generate and add a new key to the given wallet file",
   Positionals(),
-  Str(ArgName("name"), Help("The name of the key to generate"))
+  Str(SuilName("name"), Help("The name of the key to generate"))
 )
 {
     Stw::cmdGenerate(cmd);
@@ -31,7 +31,7 @@ AddCommand(gen, "Generate and add a new key to the given wallet file",
 
 AddCommand(get, "Get a key saved on the given wallet file",
   Positionals(),
-  Str(ArgName("name"), Help("The name of the key to retrieve"))
+  Str(SuilName("name"), Help("The name of the key to retrieve"))
 )
 {
     Stw::cmdGet(cmd);
@@ -53,9 +53,9 @@ int main(int argc, char* argv[])
         Commands(AddCmd(create), AddCmd(gen), AddCmd(get), AddCmd(list)),
         DefaultCmd(list),
         PromptPassword(
-            ArgName("passwd"),
+            SuilName("passwd"),
             Help("The secret used to lock/unlock the wallet file")),
-        Str(ArgName("path"),
+        Str(SuilName("path"),
             Help("A path to save the created wallet file"),
             Def(".sawtooth.key")));
     try {

@@ -246,30 +246,77 @@ namespace suil {
     bool cmdPromptWith(Command *cmd, CmdFlag *flag, const void* ctx);
     bool cmdPrompt(Command *cmd, CmdFlag *flag, const void* ctx);
 
-#ifndef SUIL_CMD_PREFIX_NAME
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_NAME)
     #define Name(N) .name = N
 #endif
-    #define ArgName(N) .name = N
-#ifndef SUIL_CMD_PREFIX_SF
+    #define SuilName(N) .name = N
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_SF)
     #define Sf(S) .sf = S
 #endif
-    #define ArgSf(S) .sf = S
+    #define SuilSf(S) .sf = S
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_HELP)
     #define Help(H) .help = H
+#endif
+    #define SuilHelp(H) .help = H
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_TYPE)
     #define Type(V) .validator = V
+#endif
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_DEF)
     #define Def(D) .def = D
+#endif
+    #define SuilDef(D) .def = D
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_POSITIONALS)
     #define Positionals(...) { __VA_ARGS__ }
+#endif
+    #define SuilPositionals(...) { __VA_ARGS__ }
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_OPT)
     #define Opt(...)  {__VA_ARGS__, .validator = NULL}
+#endif
+    #define SuilOpt(...)  {__VA_ARGS__, .validator = NULL}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_STR)
     #define Str(...)  {__VA_ARGS__, .validator = suil::cmdParseString}
+#endif
+    #define SuilStr(...)  {__VA_ARGS__, .validator = suil::cmdParseString}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_INT)
     #define Int(...)  {__VA_ARGS__, .validator = suil::cmdParseInteger}
+#endif
+    #define SuilInt(...)  {__VA_ARGS__, .validator = suil::cmdParseInteger}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_BOOL)
     #define Bool(...) {__VA_ARGS__, .validator = suil::cmdParseBoolean}
+#endif
+    #define SuilBool(...) {__VA_ARGS__, .validator = suil::cmdParseBoolean}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_FLOAT)
     #define Float(...) {__VA_ARGS__, .validator = suil::cmdParseDouble}
+#endif
+    #define SuilFloat(...) {__VA_ARGS__, .validator = suil::cmdParseDouble}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_BYTES)
     #define Bytes(...)  {__VA_ARGS__, .validator = suil::cmdParseByteSize}
+#endif
+    #define SuilBytes(...)  {__VA_ARGS__, .validator = suil::cmdParseByteSize}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_VERBOSITY)
     #define Verbosity(...)  {__VA_ARGS__, .validator = suil::cmdParseLogVerbosity}
+#endif
+    #define SuilVerbosity(...)  {__VA_ARGS__, .validator = suil::cmdParseLogVerbosity}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_USE)
     #define Use(V, ...) {__VA_ARGS__, .validator = V}
+#endif
+    #define SuilUse(V, ...) {__VA_ARGS__, .validator = V}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_PROMPT)
     #define Prompt(P, ...) {__VA_ARGS__, .prompt = P}
+#endif
+    #define SuilPrompt(P, ...) {__VA_ARGS__, .prompt = P}
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_PROMPT_CTX)
     #define PromptCtx(ctx) .promptCtx = ctx
+#endif
+    #define SuilPromptCtx(ctx) .promptCtx = ctx
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFIX_PROMPT_PASSWORD)
     #define PromptPassword(...) Prompt(suil::cmdPromptPassword, __VA_ARGS__, PromptCtx("Enter password: "))
+#endif
+    #define SuilPromptPassword(...) Prompt(suil::cmdPromptPassword, __VA_ARGS__, PromptCtx("Enter password: "))
+#if !defined(SUIL_CMD_PREFIX) && !defined(SUIL_CMD_PREFI_PROMPT_WITH)
     #define PromptWith(V, ...) Prompt(suil::cmdPromptWith, __VA_ARGS__, PromptCtx(V))
+#endif
+    #define SuilPromptWith(V, ...) Prompt(suil::cmdPromptWith, __VA_ARGS__, PromptCtx(V))
 
     #define Sizeof(T, ...) (sizeof((T[]){__VA_ARGS__})/sizeof(T))
     #define AddCommand(N, H, P, ...)                                                \
@@ -349,7 +396,9 @@ namespace suil {
     #define CMDL_HELP_CMD                                                                           \
     AddCommandLocal(help, "Get the application or help related to a specific command", nullptr,     \
             Positionals(                                                                            \
-                Str(ArgName("command"), Help("The command whose help should be retrieved"), Def(""))\
+                SuilStr(SuilName("command"),                                                        \
+                        SuilHelp("The command whose help should be retrieved"),                     \
+                        SuilDef(""))                                                                \
             )                                                                                       \
     );
 
@@ -371,11 +420,11 @@ namespace suil {
                 .nargs = 2 + Sizeof(suil::CmdFlag, __VA_ARGS__)             \
             },                                                              \
             .cmds = CMDS,                                                   \
-            .args = { Opt(ArgName("version"), Sf('v'),                      \
-                        Help("Show the application version"),               \
+            .args = { SuilOpt(SuilName("version"), SuilSf('v'),             \
+                        SuilHelp("Show the application version"),           \
                         .isAppOnly = true),                                 \
-                    Opt(ArgName("help"), Sf('h'),                           \
-                        Help("Get help for the selected command")),         \
+                    SuilOpt(SuilName("help"), SuilSf('h'),                  \
+                        SuilHelp("Get help for the selected command")),     \
                     ##__VA_ARGS__                                           \
                     }                                                       \
         };                                                                  \
