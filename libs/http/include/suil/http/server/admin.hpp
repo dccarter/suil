@@ -25,10 +25,6 @@ namespace suil::http::server {
 
             ipc::registerGetHandler(GET_STATS, [&](void *token, int src) {
                 auto& stats = ep.stats();
-                // suil::StackBoard<128> sb{};
-                // sb << stats;
-                // auto s = hexstr(sb.rd(), sb.size());
-                // strace("data: " PRIs, _PRIs(s));
                 ipc::sendGetResponse(token, src, &stats, sizeof(stats));
             });
 
@@ -98,14 +94,10 @@ namespace suil::http::server {
                 stats.push_back(ep.stats());
                 auto all = ipc::gather(GET_STATS);
                 for (auto& proc: all) {
-                    // auto s = hexstr(proc.data(), proc.size());
-                    // strace("data: " PRIs, _PRIs(s));
-                    // strace("received stats [data:%p|size:%lu]", proc.data(), proc.size());
-                    // HeapBoard hb(proc.data(), proc.size());
                     stats.emplace_back();
                     memcpy(&stats.back(), proc.data, sizeof(HttpServerStats));
-                    ipc::release(all);
                 }
+                ipc::release(all);
                 return stats;
             });
         }
