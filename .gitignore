@@ -74,5 +74,8 @@ build
 .creator
 cmake-build-*
 
+# Generate SCC files
+*.scc.*
+
 # IDE files
 .idea
