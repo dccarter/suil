@@ -3,7 +3,7 @@
 //
 
 #include "suil/base/notify.hpp"
-
+#include "suil/base/c/args.h"
 using suil::String;
 using suil::fs::Watcher;
 using suil::fs::Event;

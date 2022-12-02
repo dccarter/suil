@@ -13,19 +13,28 @@ POST http://{{host}}/api/app-init?admin=Admin
 # @name login
 GET http://{{host}}/api/login?username={{username}}&passwd={{password}}
 
+@accessToken={{login.response.body.$.accessToken}}
+@refreshToken={{login.response.body.$.refreshToken}}
+
 ###
 # @name refresh
-GET http://{{host}}/api/login?username={{username}}&passwd={{password}}
+GET http://{{host}}/api/refresh
 Authorization: Bearer {{login.response.body.$.refreshToken}}
 
-###
-GET http://{{host}}/api/revoke
-Authorization: Bearer {{login.response.body.$.accessToken}}
+#@accessToken={{refresh.response.body.$.accessToken}}
 
 ###
-GET http://{{host}}/api/_admin/route/6
-Authorization: Bearer {{login.response.body.$.accessToken}}
+DELETE http://{{host}}/api/revoke
+Authorization: Bearer {{refreshToken}}
+
+###
+GET http://{{host}}/api/_admin/routes
+Authorization: Bearer {{accessToken}}
 
 ###
 GET http://{{host}}/api/_admin/endpoint/stats
-Authorization: Bearer {{login.response.body.$.accessToken}}
+Authorization: Bearer {{accessToken}}
+
+###
+GET http://{{host}}/api/_admin/endpoint/stats
+Authorization: Bearer {{accessToken}}

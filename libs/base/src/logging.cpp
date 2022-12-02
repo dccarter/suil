@@ -16,6 +16,7 @@
 #endif
 
 namespace suil {
+    extern const uint8& spid;
 
 #ifdef SUIL_BACKTRACE
     void backtrace(char *buf, size_t size) {
@@ -150,13 +151,13 @@ namespace suil {
             case Level::ERROR:
             case Level::CRITICAL:
             case Level::WARNING:
-                wr = snprintf(tmp, sz, "%s/%05d: [%s] [%3s] [%10.10s] ",
-                              name, getpid(), Datetime()(), LOGLVL_STR[(unsigned char) l],
+                wr = snprintf(tmp, sz, "%s/%02hhu: [%s] [%3s] [%10.10s] ",
+                              name, spid, Datetime()(), LOGLVL_STR[(unsigned char) l],
                               tag);
                 break;
             case Level::TRACE:
-                wr = snprintf(tmp, sz, "%s/%05d: ",
-                              name, getpid());
+                wr = snprintf(tmp, sz, "%s/%02hhu: ",
+                              name, spid);
                 break;
             default:
                 wr = snprintf(tmp, sz, "%s: ", name);

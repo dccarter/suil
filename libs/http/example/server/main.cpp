@@ -32,10 +32,12 @@ const suil::UnorderedMap<User> users = {
         {"demo", {"example123", {"software"}}}
 };
 
+extern 
+
 int main(int argc, char *argv[])
 {
     suil::setup(opt(verbose, 0));
-    ipc::init(/*opt(nworkers, 2)*/);
+    ipc::init(opt(nworkers, 0));
 
     using Server = hs::Endpoint<
                         hs::Initializer,        // Block all routes until application is initialized

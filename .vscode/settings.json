@@ -78,7 +78,11 @@
         "thread": "cpp",
         "typeindex": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "stdlib.h": "c",
+        "utils.h": "c",
+        "args.h": "c",
+        "common.h": "c"
     }
 
 }

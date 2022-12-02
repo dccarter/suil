@@ -5,10 +5,12 @@ set(SUIL_BASE_VERSION "0.1.0" CACHE STRING "The version of suil-base library")
 project(SuilBase VERSION ${SUIL_BASE_VERSION} LANGUAGES C CXX)
 
 set(SUIL_BASE_SOURCES
+        src/argp.cpp
+        src/args.c
+        src/args.cpp        
         src/base64.cpp
         src/buffer.cpp
         src/channel.cpp
-        src/args.cpp
         src/console.cpp
         src/crypto.cpp
         src/data.cpp
